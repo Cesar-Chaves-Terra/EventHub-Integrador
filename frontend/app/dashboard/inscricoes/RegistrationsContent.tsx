@@ -21,6 +21,8 @@ interface RegistrationItem {
   status: "ACTIVE" | "CANCELLED";
 }
 
+type RegistrationStatus = RegistrationItem["status"];
+
 type ListResponse<T> = T[] | { results: T[] };
 
 function normalizeList<T>(data: ListResponse<T>): T[] {
@@ -129,6 +131,39 @@ export default function RegistrationsContent() {
     setError("");
   }
 
+  function getAvailableSeats(eventId: number): number {
+    return (
+      events.find((event) => event.id === eventId)
+        ?.available_seats ?? 0
+    );
+  }
+
+  function findExistingRegistration(
+    eventId: number,
+    participantId: number
+  ): RegistrationItem | undefined {
+    return registrations.find(
+      (registration) =>
+        registration.event === eventId &&
+        registration.participant === participantId
+    );
+  }
+
+  async function updateRegistrationStatus(
+    registrationId: number,
+    status: RegistrationStatus,
+    token: string
+  ): Promise<void> {
+    await apiRequest<RegistrationItem>(
+      `/registrations/${registrationId}/`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      },
+      token
+    );
+  }
+
   async function handleCreateRegistration(
     data: RegistrationFormData
   ): Promise<void> {
@@ -146,42 +181,85 @@ export default function RegistrationsContent() {
     try {
       let participantId: number;
 
+      if (getAvailableSeats(data.event) <= 0) {
+        throw new Error(
+          "Este evento não possui vagas disponíveis."
+        );
+      }
+
       if (data.participantType === "existing") {
         participantId = data.participant;
       } else {
-        const participant =
-          await apiRequest<RegistrationParticipant>(
-            "/participants/",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                name: data.name,
-                email: data.email,
-                phone_number: data.phone_number || null,
-              }),
-            },
-            token
-          );
+        const normalizedEmail = data.email
+          .trim()
+          .toLowerCase();
 
-        participantId = participant.id;
+        const existingParticipant = participants.find(
+          (participant) =>
+            participant.email.trim().toLowerCase() ===
+            normalizedEmail
+        );
+
+        if (existingParticipant) {
+          participantId = existingParticipant.id;
+        } else {
+          const participant =
+            await apiRequest<RegistrationParticipant>(
+              "/participants/",
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  name: data.name,
+                  email: normalizedEmail,
+                  phone_number: data.phone_number || null,
+                }),
+              },
+              token
+            );
+
+          participantId = participant.id;
+        }
       }
 
-      await apiRequest<RegistrationItem>(
-        "/registrations/",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            event: data.event,
-            participant: participantId,
-            status: "ACTIVE",
-          }),
-        },
-        token
+      const existingRegistration = findExistingRegistration(
+        data.event,
+        participantId
       );
 
-      setMessage("Inscrição cadastrada com sucesso!");
-      setShowForm(false);
+      if (existingRegistration?.status === "ACTIVE") {
+        throw new Error(
+          "Este participante já possui uma inscrição ativa neste evento."
+        );
+      }
 
+      if (existingRegistration?.status === "CANCELLED") {
+        await updateRegistrationStatus(
+          existingRegistration.id,
+          "ACTIVE",
+          token
+        );
+
+        setMessage(
+          "Inscrição existente reativada com sucesso!"
+        );
+      } else {
+        await apiRequest<RegistrationItem>(
+          "/registrations/",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              event: data.event,
+              participant: participantId,
+              status: "ACTIVE",
+            }),
+          },
+          token
+        );
+
+        setMessage("Inscrição cadastrada com sucesso!");
+      }
+
+      setShowForm(false);
       await loadRegistrations();
     } catch (err) {
       setError(
@@ -194,11 +272,29 @@ export default function RegistrationsContent() {
     }
   }
 
-  async function handleCancelRegistration(
-    registrationId: number
+  async function handleChangeStatus(
+    registration: RegistrationItem
   ): Promise<void> {
+    const isActive = registration.status === "ACTIVE";
+    const newStatus: RegistrationStatus = isActive
+      ? "CANCELLED"
+      : "ACTIVE";
+
+    if (
+      newStatus === "ACTIVE" &&
+      getAvailableSeats(registration.event) <= 0
+    ) {
+      setError(
+        "Não é possível reativar a inscrição: o evento está lotado."
+      );
+      setMessage("");
+      return;
+    }
+
     const confirmed = window.confirm(
-      "Deseja realmente cancelar esta inscrição?"
+      isActive
+        ? "Deseja realmente cancelar esta inscrição?"
+        : "Deseja reativar esta inscrição?"
     );
 
     if (!confirmed) {
@@ -212,29 +308,29 @@ export default function RegistrationsContent() {
       return;
     }
 
-    setUpdatingId(registrationId);
+    setUpdatingId(registration.id);
     setError("");
     setMessage("");
 
     try {
-      await apiRequest<RegistrationItem>(
-        `/registrations/${registrationId}/`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            status: "CANCELLED",
-          }),
-        },
+      await updateRegistrationStatus(
+        registration.id,
+        newStatus,
         token
       );
 
-      setMessage("Inscrição cancelada com sucesso!");
+      setMessage(
+        isActive
+          ? "Inscrição cancelada com sucesso!"
+          : "Inscrição reativada com sucesso!"
+      );
+
       await loadRegistrations();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível cancelar a inscrição."
+          : "Não foi possível atualizar a inscrição."
       );
     } finally {
       setUpdatingId(null);
@@ -313,7 +409,6 @@ export default function RegistrationsContent() {
       />
 
       <div className="mx-auto max-w-7xl space-y-7 p-6 md:p-10">
-        {/* Welcome banner */}
         <section className="relative overflow-hidden rounded-2xl border border-[#B900F5]/20 bg-gradient-to-br from-[#30133E] via-[#1A0C24] to-[#0C0612] p-7 md:p-10">
           <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[#B900F5]/15 blur-3xl" />
 
@@ -333,7 +428,6 @@ export default function RegistrationsContent() {
           </div>
         </section>
 
-        {/* Feedback */}
         {message && (
           <div
             role="status"
@@ -352,7 +446,6 @@ export default function RegistrationsContent() {
           </div>
         )}
 
-        {/* New registration */}
         <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-5 md:p-6">
           <div className="flex flex-wrap items-center justify-between gap-5">
             <div>
@@ -375,12 +468,8 @@ export default function RegistrationsContent() {
           </div>
         </section>
 
-        {/* Registration form */}
         {showForm && (
-          <div
-            ref={formRef}
-            className="scroll-mt-6"
-          >
+          <div ref={formRef} className="scroll-mt-6">
             <RegistrationForm
               events={events}
               participants={participants}
@@ -391,7 +480,6 @@ export default function RegistrationsContent() {
           </div>
         )}
 
-        {/* Compact statistics */}
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {stats.map((stat) => (
             <div
@@ -423,7 +511,6 @@ export default function RegistrationsContent() {
           ))}
         </section>
 
-        {/* Registered participants */}
         <section>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -445,7 +532,6 @@ export default function RegistrationsContent() {
             </span>
           </div>
 
-          {/* Search and event filter */}
           <div className="mb-5 rounded-xl border border-[#B900F5]/20 bg-[#1A0C24] p-4">
             <div className="grid gap-3 md:grid-cols-2">
               <input
@@ -468,10 +554,7 @@ export default function RegistrationsContent() {
                 <option value="all">Todos os eventos</option>
 
                 {events.map((event) => (
-                  <option
-                    key={event.id}
-                    value={event.id}
-                  >
+                  <option key={event.id} value={event.id}>
                     {event.name}
                   </option>
                 ))}
@@ -479,7 +562,6 @@ export default function RegistrationsContent() {
             </div>
           </div>
 
-          {/* Registration table */}
           {loading ? (
             <div className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-10 text-center">
               <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
@@ -513,74 +595,89 @@ export default function RegistrationsContent() {
                 </thead>
 
                 <tbody className="divide-y divide-[#B900F5]/10">
-                  {filteredRegistrations.map((registration) => (
-                    <tr
-                      key={registration.id}
-                      className="transition hover:bg-[#B900F5]/5"
-                    >
-                      <td className="px-4 py-3 font-semibold text-white">
-                        {registration.participant_details?.name ??
-                          "Participante"}
-                      </td>
+                  {filteredRegistrations.map((registration) => {
+                    const isActive =
+                      registration.status === "ACTIVE";
 
-                      <td className="px-4 py-3 text-[#AD99B8]">
-                        <p className="break-all">
-                          {registration.participant_details?.email ??
-                            "—"}
-                        </p>
+                    const eventHasSeats =
+                      getAvailableSeats(registration.event) > 0;
 
-                        <p className="mt-1 text-xs">
-                          {registration.participant_details
-                            ?.phone_number || "Sem telefone"}
-                        </p>
-                      </td>
+                    const isUpdating =
+                      updatingId === registration.id;
 
-                      <td className="px-4 py-3 text-[#D7C4E0]">
-                        {getEventName(registration.event)}
-                      </td>
+                    return (
+                      <tr
+                        key={registration.id}
+                        className="transition hover:bg-[#B900F5]/5"
+                      >
+                        <td className="px-4 py-3 font-semibold text-white">
+                          {registration.participant_details?.name ??
+                            "Participante"}
+                        </td>
 
-                      <td className="whitespace-nowrap px-4 py-3 text-[#AD99B8]">
-                        {formatDate(registration.registration_date)}
-                      </td>
+                        <td className="px-4 py-3 text-[#AD99B8]">
+                          <p className="break-all">
+                            {registration.participant_details?.email ??
+                              "—"}
+                          </p>
 
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                            registration.status === "ACTIVE"
-                              ? "bg-[#B900F5]/15 text-[#E27BFF]"
-                              : "bg-white/5 text-[#AD99B8]"
-                          }`}
-                        >
-                          {registration.status === "ACTIVE"
-                            ? "Ativa"
-                            : "Cancelada"}
-                        </span>
-                      </td>
+                          <p className="mt-1 text-xs">
+                            {registration.participant_details
+                              ?.phone_number || "Sem telefone"}
+                          </p>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        {registration.status === "ACTIVE" ? (
+                        <td className="px-4 py-3 text-[#D7C4E0]">
+                          {getEventName(registration.event)}
+                        </td>
+
+                        <td className="whitespace-nowrap px-4 py-3 text-[#AD99B8]">
+                          {formatDate(registration.registration_date)}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
+                              isActive
+                                ? "bg-[#B900F5]/15 text-[#E27BFF]"
+                                : "bg-white/5 text-[#AD99B8]"
+                            }`}
+                          >
+                            {isActive ? "Ativa" : "Cancelada"}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
                           <button
                             type="button"
                             onClick={() =>
-                              handleCancelRegistration(
-                                registration.id
-                              )
+                              handleChangeStatus(registration)
                             }
-                            disabled={updatingId !== null}
-                            className="rounded-lg border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
+                            disabled={
+                              updatingId !== null ||
+                              (!isActive && !eventHasSeats)
+                            }
+                            title={
+                              !isActive && !eventHasSeats
+                                ? "Evento sem vagas disponíveis"
+                                : undefined
+                            }
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                              isActive
+                                ? "border-red-400/20 text-red-300 hover:bg-red-500/10"
+                                : "border-[#B900F5]/30 text-[#E27BFF] hover:bg-[#B900F5]/10"
+                            }`}
                           >
-                            {updatingId === registration.id
-                              ? "Cancelando..."
-                              : "Cancelar"}
+                            {isUpdating
+                              ? "Atualizando..."
+                              : isActive
+                                ? "Cancelar"
+                                : "Reativar"}
                           </button>
-                        ) : (
-                          <span className="text-xs text-[#8F7A9B]">
-                            Sem ações
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
