@@ -1,28 +1,22 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
+
 import PageHeader from "@/components/layout/PageHeader";
-
-interface EventItem {
-  id: number;
-  name: string;
-}
-
-interface Participant {
-  id: number;
-  name: string;
-  email: string;
-  phone_number: string | null;
-}
+import RegistrationForm, {
+  type RegistrationEvent,
+  type RegistrationParticipant,
+  type RegistrationFormData,
+} from "@/components/registrations/RegistrationForm";
 
 interface RegistrationItem {
   id: number;
   event: number;
   participant: number;
-  participant_details: Participant;
+  participant_details: RegistrationParticipant;
   registration_date: string;
   status: "ACTIVE" | "CANCELLED";
 }
@@ -35,17 +29,26 @@ function normalizeList<T>(data: ListResponse<T>): T[] {
 
 export default function RegistrationsPage() {
   const router = useRouter();
+  const formRef = useRef<HTMLDivElement | null>(null);
 
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [registrations, setRegistrations] = useState<RegistrationItem[]>([]);
+  const [events, setEvents] = useState<RegistrationEvent[]>([]);
+  const [participants, setParticipants] = useState<
+    RegistrationParticipant[]
+  >([]);
+  const [registrations, setRegistrations] = useState<
+    RegistrationItem[]
+  >([]);
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [selectedEvent, setSelectedEvent] = useState("all");
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const loadRegistrations = useCallback(async () => {
     const token = sessionStorage.getItem("access");
@@ -56,20 +59,27 @@ export default function RegistrationsPage() {
     }
 
     try {
-      const [eventsData, registrationsData] = await Promise.all([
-        apiRequest<ListResponse<EventItem>>(
-          "/events/",
-          {},
-          token
-        ),
-        apiRequest<ListResponse<RegistrationItem>>(
-          "/registrations/",
-          {},
-          token
-        ),
-      ]);
+      const [eventsData, participantsData, registrationsData] =
+        await Promise.all([
+          apiRequest<ListResponse<RegistrationEvent>>(
+            "/events/",
+            {},
+            token
+          ),
+          apiRequest<ListResponse<RegistrationParticipant>>(
+            "/participants/",
+            {},
+            token
+          ),
+          apiRequest<ListResponse<RegistrationItem>>(
+            "/registrations/",
+            {},
+            token
+          ),
+        ]);
 
       setEvents(normalizeList(eventsData));
+      setParticipants(normalizeList(participantsData));
       setRegistrations(normalizeList(registrationsData));
     } catch (err) {
       setError(
@@ -85,6 +95,103 @@ export default function RegistrationsPage() {
   useEffect(() => {
     void loadRegistrations();
   }, [loadRegistrations]);
+
+  useEffect(() => {
+    if (!showForm) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [showForm]);
+
+  function handleCreateClick() {
+    setError("");
+    setMessage("");
+    setShowForm(true);
+
+    if (showForm) {
+      formRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }
+
+  function handleCancelForm() {
+    setShowForm(false);
+    setError("");
+  }
+
+  async function handleCreateRegistration(
+    data: RegistrationFormData
+  ): Promise<void> {
+    const token = sessionStorage.getItem("access");
+
+    if (!token) {
+      router.replace("/");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      let participantId: number;
+
+      if (data.participantType === "existing") {
+        participantId = data.participant;
+      } else {
+        const participant = await apiRequest<RegistrationParticipant>(
+          "/participants/",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              name: data.name,
+              email: data.email,
+              phone_number: data.phone_number || null,
+            }),
+          },
+          token
+        );
+
+        participantId = participant.id;
+      }
+
+      await apiRequest<RegistrationItem>(
+        "/registrations/",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            event: data.event,
+            participant: participantId,
+            status: "ACTIVE",
+          }),
+        },
+        token
+      );
+
+      setMessage("Inscrição cadastrada com sucesso!");
+      setShowForm(false);
+
+      await loadRegistrations();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível cadastrar a inscrição."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleCancelRegistration(
     registrationId: number
@@ -121,6 +228,7 @@ export default function RegistrationsPage() {
       );
 
       setMessage("Inscrição cancelada com sucesso!");
+
       await loadRegistrations();
     } catch (err) {
       setError(
@@ -133,14 +241,14 @@ export default function RegistrationsPage() {
     }
   }
 
-  function getEventName(eventId: number) {
+  function getEventName(eventId: number): string {
     return (
       events.find((event) => event.id === eventId)?.name ??
       "Evento não encontrado"
     );
   }
 
-  function formatDate(date: string) {
+  function formatDate(date: string): string {
     return new Date(date).toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
@@ -164,7 +272,7 @@ export default function RegistrationsPage() {
         selectedEvent === "all" ||
         registration.event.toString() === selectedEvent;
 
-      return matchesSearch && matchesEvent;
+      return Boolean(matchesSearch && matchesEvent);
     }
   );
 
@@ -180,16 +288,19 @@ export default function RegistrationsPage() {
     {
       label: "Total de inscrições",
       value: registrations.length,
+      description: "Inscrições registradas",
       icon: "▤",
     },
     {
       label: "Inscrições ativas",
       value: activeCount,
+      description: "Participações confirmadas",
       icon: "✦",
     },
     {
       label: "Inscrições canceladas",
       value: cancelledCount,
+      description: "Participações canceladas",
       icon: "◇",
     },
   ];
@@ -201,11 +312,23 @@ export default function RegistrationsPage() {
         title="Inscrições"
       />
 
-      <div className="mx-auto max-w-7xl space-y-8 p-6 md:p-10">
-        <p className="text-sm text-[#AD99B8]">
-          Consulte os participantes e gerencie as inscrições
-          dos seus eventos.
-        </p>
+      <div className="mx-auto max-w-7xl space-y-7 p-6 md:p-10">
+        <section className="relative overflow-hidden rounded-2xl border border-[#B900F5]/20 bg-gradient-to-br from-[#30133E] via-[#1A0C24] to-[#0C0612] p-7 md:p-10">
+          <div className="relative z-10">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#E27BFF]">
+              EventHub Experience
+            </p>
+
+            <h2 className="mt-3 text-2xl font-black text-white md:text-4xl">
+              Gerencie seus participantes.
+            </h2>
+
+            <p className="mt-3 max-w-xl text-sm leading-7 text-[#CBB5D5]">
+              Consulte inscrições, acompanhe participantes e
+              organize a ocupação dos seus eventos.
+            </p>
+          </div>
+        </section>
 
         {message && (
           <div className="rounded-xl border border-[#B900F5]/30 bg-[#B900F5]/10 p-4 text-sm text-[#E27BFF]">
@@ -214,92 +337,68 @@ export default function RegistrationsPage() {
         )}
 
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+          <div
+            role="alert"
+            className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
+          >
             {error}
           </div>
         )}
 
-        <section className="grid gap-4 sm:grid-cols-3">
-          {stats.map((item) => (
-            <div
-              key={item.label}
-              className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-6"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-[#AD99B8]">
-                  {item.label}
-                </p>
+        <section>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#E27BFF]">
+                Participantes
+              </p>
 
-                <span className="text-xl text-[#E27BFF]">
-                  {item.icon}
-                </span>
-              </div>
+              <h2 className="mt-2 text-2xl font-bold text-white">
+                Inscrições cadastradas
+              </h2>
 
-              <p className="mt-4 text-4xl font-bold text-white">
-                {loading
-                  ? "..."
-                  : item.value.toLocaleString("pt-BR")}
+              <p className="mt-2 text-sm text-[#AD99B8]">
+                Consulte os participantes e gerencie suas inscrições.
               </p>
             </div>
-          ))}
-        </section>
 
-        <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-6">
-          <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-[#E27BFF]">
-              Consulta
-            </p>
-
-            <h2 className="mt-2 text-xl font-bold text-white">
-              Buscar inscrições
-            </h2>
+            <span className="rounded-xl border border-[#B900F5]/25 bg-[#24102F] px-4 py-2 text-sm font-semibold text-[#E27BFF]">
+              {registrations.length} inscrições
+            </span>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por nome ou e-mail..."
-              className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none placeholder:text-[#796A83] focus:border-[#B900F5]"
-            />
+          <div className="mb-5 rounded-xl border border-[#B900F5]/20 bg-[#1A0C24] p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por nome ou e-mail..."
+                aria-label="Buscar inscrições"
+                className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none placeholder:text-[#796A83] focus:border-[#B900F5]"
+              />
 
-            <select
-              value={selectedEvent}
-              onChange={(event) =>
-                setSelectedEvent(event.target.value)
-              }
-              className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none focus:border-[#B900F5]"
-            >
-              <option value="all">Todos os eventos</option>
+              <select
+                value={selectedEvent}
+                onChange={(event) =>
+                  setSelectedEvent(event.target.value)
+                }
+                aria-label="Filtrar por evento"
+                className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none focus:border-[#B900F5]"
+              >
+                <option value="all">Todos os eventos</option>
 
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </section>
-
-        <section>
-          <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-[#E27BFF]">
-              Participantes
-            </p>
-
-            <h2 className="mt-2 text-xl font-bold text-white">
-              Inscrições cadastradas
-            </h2>
-
-            <p className="mt-2 text-sm text-[#AD99B8]">
-              {filteredRegistrations.length} inscrições encontradas
-            </p>
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {loading ? (
-            <div className="py-12 text-center">
-              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
+            <div className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-12 text-center">
+              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
 
               <p className="mt-4 text-sm text-[#AD99B8]">
                 Carregando inscrições...
@@ -312,7 +411,7 @@ export default function RegistrationsPage() {
               </h3>
 
               <p className="mt-2 text-sm text-[#AD99B8]">
-                Tente alterar os filtros de pesquisa.
+                Cadastre uma inscrição ou altere os filtros.
               </p>
             </div>
           ) : (
@@ -383,9 +482,7 @@ export default function RegistrationsPage() {
                                 registration.id
                               )
                             }
-                            disabled={
-                              updatingId === registration.id
-                            }
+                            disabled={updatingId !== null}
                             className="rounded-lg border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
                           >
                             {updatingId === registration.id
@@ -405,6 +502,69 @@ export default function RegistrationsPage() {
             </div>
           )}
         </section>
+
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="flex min-h-28 flex-col justify-between rounded-xl border border-[#B900F5]/20 bg-[#1A0C24] p-4 transition hover:border-[#B900F5]/50"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-[#AD99B8]">
+                  {stat.label}
+                </p>
+
+                <span className="text-lg text-[#E27BFF]">
+                  {stat.icon}
+                </span>
+              </div>
+
+              <div className="mt-2">
+                <p className="text-2xl font-bold text-white">
+                  {stat.value.toLocaleString("pt-BR")}
+                </p>
+
+                <p className="mt-1 text-xs text-[#8F7A9B]">
+                  {stat.description}
+                </p>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-5 md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                Nova inscrição
+              </h2>
+
+              <p className="mt-2 text-sm text-[#AD99B8]">
+                Cadastre um participante em um evento disponível.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCreateClick}
+              className="rounded-xl bg-[#B900F5] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#B900F5]/20 transition hover:bg-[#D338FF]"
+            >
+              + Nova inscrição
+            </button>
+          </div>
+        </section>
+
+        {showForm && (
+          <div ref={formRef} className="scroll-mt-6">
+            <RegistrationForm
+              events={events}
+              participants={participants}
+              onSubmit={handleCreateRegistration}
+              onCancel={handleCancelForm}
+              loading={saving}
+            />
+          </div>
+        )}
 
         <footer className="border-t border-[#B900F5]/15 pt-6 text-center text-xs tracking-wider text-[#796A83]">
           EVENTHUB · THE EXPERIENCE STARTS HERE
