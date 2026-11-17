@@ -4,7 +4,7 @@
 import { useRouter } from "next/navigation";
 
 interface SidebarProps {
-  activePage: "dashboard" | "eventos";
+  activePage: "dashboard" | "eventos" | "inscricoes";
   onLogout: () => void;
 }
 
@@ -58,6 +58,16 @@ export default function Sidebar({
         >
           <span className="text-[#D66ABD]">✦</span>
           Eventos
+        </button>
+
+        <button
+          onClick={() => router.push("/inscricoes")}
+          className={`${baseClass} ${
+            activePage === "inscricoes" ? activeClass : inactiveClass
+          }`}
+        >
+          <span className="text-[#B99A55]">♙</span>
+          Inscrições
         </button>
       </nav>
 
