@@ -1,25 +1,38 @@
-from rest_framework import permissions, viewsets
+
+from rest_framework import permissions, serializers, viewsets
 
 from .models import Registration
 from .serializers import RegistrationSerializer
 
 
 class RegistrationViewSet(viewsets.ModelViewSet):
-    queryset = Registration.objects.all()
     serializer_class = RegistrationSerializer
 
     def get_permissions(self):
-        if self.action in ["list", "retrieve"]:
-            return [permissions.AllowAny()]
-
         return [permissions.IsAuthenticated()]
 
+    def get_queryset(self):
+        return (
+            Registration.objects
+            .filter(event__organizer__user=self.request.user)
+            .select_related("event", "participant")
+        )
 
-#| Método | Endpoint                | Acesso      |
-#| ------ | ----------------------- | ----------- |
-#| GET    | /api/registrations/   | Público     |
-#| GET    | /api/registrations/1/ | Público     |
-#| POST   | /api/registrations/   | Autenticado |
-#| PUT    | /api/registrations/1/ | Autenticado |
-#| PATCH  | /api/registrations/1/ | Autenticado |
-#| DELETE | /api/registrations/1/ | Autenticado |
+    def validate_event_ownership(self, event):
+        if event.organizer.user_id != self.request.user.id:
+            raise serializers.ValidationError({
+                "event": "Você não tem permissão para gerenciar inscrições deste evento."
+            })
+
+    def perform_create(self, serializer):
+        event = serializer.validated_data["event"]
+        self.validate_event_ownership(event)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        event = serializer.validated_data.get(
+            "event",
+            serializer.instance.event
+        )
+        self.validate_event_ownership(event)
+        serializer.save()
