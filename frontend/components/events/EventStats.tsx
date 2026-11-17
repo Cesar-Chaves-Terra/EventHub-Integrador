@@ -16,55 +16,47 @@ export default function EventStats({
       value: totalEvents,
       description: "Total de eventos criados",
       icon: "✦",
-      iconColor: "text-[#D66ABD]",
-      iconBackground: "bg-[#A8328D]/15",
     },
     {
       label: "Capacidade total",
       value: totalCapacity,
       description: "Vagas disponibilizadas",
       icon: "♙",
-      iconColor: "text-[#B99A55]",
-      iconBackground: "bg-[#B99A55]/15",
     },
     {
       label: "Vagas restantes",
       value: availableSeats,
       description: "Vagas ainda disponíveis",
       icon: "◇",
-      iconColor: "text-emerald-400",
-      iconBackground: "bg-emerald-400/10",
     },
   ];
 
   return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {stats.map((stat) => (
         <div
           key={stat.label}
-          className="rounded-2xl border border-white/10 bg-[#15121A] p-6 transition hover:border-[#A8328D]/30"
+          className="flex min-h-28 flex-col justify-between rounded-xl border border-[#B900F5]/20 bg-[#1A0C24] p-4 transition hover:border-[#B900F5]/50"
         >
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400">
-                {stat.label}
-              </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-[#AD99B8]">
+              {stat.label}
+            </p>
 
-              <p className="mt-3 text-3xl font-black text-white">
-                {stat.value.toLocaleString("pt-BR")}
-              </p>
-            </div>
-
-            <div
-              className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl ${stat.iconColor} ${stat.iconBackground}`}
-            >
+            <span className="text-lg text-[#E27BFF]">
               {stat.icon}
-            </div>
+            </span>
           </div>
 
-          <p className="mt-4 text-xs text-gray-500">
-            {stat.description}
-          </p>
+          <div className="mt-2">
+            <p className="text-2xl font-bold text-white">
+              {stat.value.toLocaleString("pt-BR")}
+            </p>
+
+            <p className="mt-1 text-xs text-[#8F7A9B]">
+              {stat.description}
+            </p>
+          </div>
         </div>
       ))}
     </section>
