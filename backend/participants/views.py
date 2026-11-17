@@ -6,8 +6,13 @@ from rest_framework import (
     mixins,
     permissions,
     serializers,
+    status,
     viewsets,
 )
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from events.models import Event
 
 from .models import Participant, Registration
 from .serializers import (
@@ -79,7 +84,6 @@ class RegistrationViewSet(viewsets.ModelViewSet):
         event = serializer.validated_data["event"]
 
         self.validate_event_ownership(event)
-
         self.save_registration(serializer)
 
     def perform_update(self, serializer):
@@ -112,3 +116,80 @@ class RegistrationViewSet(viewsets.ModelViewSet):
             })
 
         self.save_registration(serializer)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="enroll",
+    )
+    def enroll(self, request):
+        event_id = request.data.get("event")
+
+        event = Event.objects.filter(
+            pk=event_id,
+            organizer__user=request.user,
+        ).first()
+
+        if event is None:
+            raise serializers.ValidationError({
+                "event": (
+                    "Evento não encontrado ou sem permissão "
+                    "para gerenciar inscrições."
+                )
+            })
+
+        participant_data = {
+            "name": request.data.get("name"),
+            "email": request.data.get("email"),
+            "phone_number": request.data.get(
+                "phone_number"
+            ) or None,
+        }
+
+        participant_serializer = ParticipantSerializer(
+            data=participant_data
+        )
+
+        participant_serializer.is_valid(
+            raise_exception=True
+        )
+
+        try:
+            with transaction.atomic():
+                participant = participant_serializer.save()
+
+                registration_serializer = RegistrationSerializer(
+                    data={
+                        "event": event.pk,
+                        "participant": participant.pk,
+                        "status": "ACTIVE",
+                    }
+                )
+
+                registration_serializer.is_valid(
+                    raise_exception=True
+                )
+
+                registration = registration_serializer.save()
+
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({
+                "detail": exc.messages
+            }) from exc
+
+        except IntegrityError as exc:
+            raise serializers.ValidationError({
+                "detail": (
+                    "Não foi possível concluir a inscrição. "
+                    "Verifique os dados e tente novamente."
+                )
+            }) from exc
+
+        response_serializer = RegistrationSerializer(
+            registration
+        )
+
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
