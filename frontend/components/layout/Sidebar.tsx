@@ -1,18 +1,15 @@
 
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface SidebarProps {
-  activePage: "dashboard" | "eventos" | "inscricoes";
   onLogout: () => void;
 }
 
-export default function Sidebar({
-  activePage,
-  onLogout,
-}: SidebarProps) {
-  const router = useRouter();
+export default function Sidebar({ onLogout }: SidebarProps) {
+  const pathname = usePathname();
 
   const baseClass =
     "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition";
@@ -22,6 +19,27 @@ export default function Sidebar({
 
   const activeClass =
     "border border-[#A8328D]/30 bg-[#A8328D]/15 font-semibold text-white";
+
+  const menuItems = [
+    {
+      label: "Dashboard",
+      href: "/dashboard",
+      icon: "⌂",
+      iconColor: "",
+    },
+    {
+      label: "Eventos",
+      href: "/dashboard/eventos",
+      icon: "✦",
+      iconColor: "text-[#D66ABD]",
+    },
+    {
+      label: "Inscrições",
+      href: "/dashboard/inscricoes",
+      icon: "♙",
+      iconColor: "text-[#B99A55]",
+    },
+  ];
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-white/10 bg-[#100D15] p-6 md:flex">
@@ -40,35 +58,25 @@ export default function Sidebar({
       </p>
 
       <nav className="space-y-2">
-        <button
-          onClick={() => router.push("/dashboard")}
-          className={`${baseClass} ${
-            activePage === "dashboard" ? activeClass : inactiveClass
-          }`}
-        >
-          <span>⌂</span>
-          Dashboard
-        </button>
+        {menuItems.map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/dashboard" &&
+              pathname.startsWith(`${item.href}/`));
 
-        <button
-          onClick={() => router.push("/eventos")}
-          className={`${baseClass} ${
-            activePage === "eventos" ? activeClass : inactiveClass
-          }`}
-        >
-          <span className="text-[#D66ABD]">✦</span>
-          Eventos
-        </button>
-
-        <button
-          onClick={() => router.push("/inscricoes")}
-          className={`${baseClass} ${
-            activePage === "inscricoes" ? activeClass : inactiveClass
-          }`}
-        >
-          <span className="text-[#B99A55]">♙</span>
-          Inscrições
-        </button>
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`${baseClass} ${
+                isActive ? activeClass : inactiveClass
+              }`}
+            >
+              <span className={item.iconColor}>{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="mt-auto border-t border-white/10 pt-6">
