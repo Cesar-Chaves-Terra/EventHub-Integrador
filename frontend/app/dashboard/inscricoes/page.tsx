@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
+import PageHeader from "@/components/layout/PageHeader";
 
 interface EventItem {
   id: number;
@@ -26,7 +27,9 @@ interface RegistrationItem {
   status: "ACTIVE" | "CANCELLED";
 }
 
-function normalizeList<T>(data: T[] | { results: T[] }): T[] {
+type ListResponse<T> = T[] | { results: T[] };
+
+function normalizeList<T>(data: ListResponse<T>): T[] {
   return Array.isArray(data) ? data : data.results;
 }
 
@@ -35,9 +38,11 @@ export default function RegistrationsPage() {
 
   const [events, setEvents] = useState<EventItem[]>([]);
   const [registrations, setRegistrations] = useState<RegistrationItem[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
   const [search, setSearch] = useState("");
   const [selectedEvent, setSelectedEvent] = useState("all");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -51,15 +56,13 @@ export default function RegistrationsPage() {
     }
 
     try {
-      setError("");
-
       const [eventsData, registrationsData] = await Promise.all([
-        apiRequest<EventItem[] | { results: EventItem[] }>(
+        apiRequest<ListResponse<EventItem>>(
           "/events/",
           {},
           token
         ),
-        apiRequest<RegistrationItem[] | { results: RegistrationItem[] }>(
+        apiRequest<ListResponse<RegistrationItem>>(
           "/registrations/",
           {},
           token
@@ -80,15 +83,19 @@ export default function RegistrationsPage() {
   }, [router]);
 
   useEffect(() => {
-    loadRegistrations();
+    void loadRegistrations();
   }, [loadRegistrations]);
 
-  async function handleCancelRegistration(registrationId: number) {
+  async function handleCancelRegistration(
+    registrationId: number
+  ): Promise<void> {
     const confirmed = window.confirm(
       "Deseja realmente cancelar esta inscrição?"
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     const token = sessionStorage.getItem("access");
 
@@ -127,7 +134,10 @@ export default function RegistrationsPage() {
   }
 
   function getEventName(eventId: number) {
-    return events.find((event) => event.id === eventId)?.name ?? "Evento não encontrado";
+    return (
+      events.find((event) => event.id === eventId)?.name ??
+      "Evento não encontrado"
+    );
   }
 
   function formatDate(date: string) {
@@ -140,20 +150,23 @@ export default function RegistrationsPage() {
     });
   }
 
-  const filteredRegistrations = registrations.filter((registration) => {
-    const participant = registration.participant_details;
-    const searchValue = search.toLowerCase();
+  const filteredRegistrations = registrations.filter(
+    (registration) => {
+      const participant = registration.participant_details;
+      const searchValue = search.trim().toLowerCase();
 
-    const matchesSearch =
-      participant?.name?.toLowerCase().includes(searchValue) ||
-      participant?.email?.toLowerCase().includes(searchValue);
+      const matchesSearch =
+        !searchValue ||
+        participant?.name?.toLowerCase().includes(searchValue) ||
+        participant?.email?.toLowerCase().includes(searchValue);
 
-    const matchesEvent =
-      selectedEvent === "all" ||
-      registration.event.toString() === selectedEvent;
+      const matchesEvent =
+        selectedEvent === "all" ||
+        registration.event.toString() === selectedEvent;
 
-    return matchesSearch && matchesEvent;
-  });
+      return matchesSearch && matchesEvent;
+    }
+  );
 
   const activeCount = registrations.filter(
     (registration) => registration.status === "ACTIVE"
@@ -163,69 +176,81 @@ export default function RegistrationsPage() {
     (registration) => registration.status === "CANCELLED"
   ).length;
 
+  const stats = [
+    {
+      label: "Total de inscrições",
+      value: registrations.length,
+      icon: "▤",
+    },
+    {
+      label: "Inscrições ativas",
+      value: activeCount,
+      icon: "✦",
+    },
+    {
+      label: "Inscrições canceladas",
+      value: cancelledCount,
+      icon: "◇",
+    },
+  ];
+
   return (
-    <>
-      <header className="border-b border-white/10 px-6 py-6 md:px-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#B99A55]">
-          Gerenciamento
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-white md:text-3xl">
-          Inscrições
-        </h1>
-        <p className="mt-2 text-sm text-gray-400">
-          Consulte os participantes e gerencie as inscrições dos seus eventos.
-        </p>
-      </header>
+    <div className="min-h-screen bg-[#0C0612] text-[#F7ECFC]">
+      <PageHeader
+        eyebrow="Gerenciamento"
+        title="Inscrições"
+      />
 
       <div className="mx-auto max-w-7xl space-y-8 p-6 md:p-10">
+        <p className="text-sm text-[#AD99B8]">
+          Consulte os participantes e gerencie as inscrições
+          dos seus eventos.
+        </p>
+
         {message && (
-          <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-400">
+          <div className="rounded-xl border border-[#B900F5]/30 bg-[#B900F5]/10 p-4 text-sm text-[#E27BFF]">
             {message}
           </div>
         )}
 
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
             {error}
           </div>
         )}
 
         <section className="grid gap-4 sm:grid-cols-3">
-          {[
-            {
-              label: "Total de inscrições",
-              value: registrations.length,
-              color: "text-white",
-            },
-            {
-              label: "Inscrições ativas",
-              value: activeCount,
-              color: "text-[#D66ABD]",
-            },
-            {
-              label: "Inscrições canceladas",
-              value: cancelledCount,
-              color: "text-[#B99A55]",
-            },
-          ].map((item) => (
+          {stats.map((item) => (
             <div
               key={item.label}
-              className="rounded-2xl border border-white/10 bg-[#15121A] p-6"
+              className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-6"
             >
-              <p className="text-sm text-gray-400">{item.label}</p>
-              <p className={`mt-4 text-4xl font-bold ${item.color}`}>
-                {item.value}
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#AD99B8]">
+                  {item.label}
+                </p>
+
+                <span className="text-xl text-[#E27BFF]">
+                  {item.icon}
+                </span>
+              </div>
+
+              <p className="mt-4 text-4xl font-bold text-white">
+                {loading
+                  ? "..."
+                  : item.value.toLocaleString("pt-BR")}
               </p>
             </div>
           ))}
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-[#15121A] p-6">
+        <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-6">
           <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-[#B99A55]">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#E27BFF]">
               Consulta
             </p>
-            <h2 className="mt-1 text-xl font-bold text-white">
+
+            <h2 className="mt-2 text-xl font-bold text-white">
               Buscar inscrições
             </h2>
           </div>
@@ -236,15 +261,18 @@ export default function RegistrationsPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por nome ou e-mail..."
-              className="w-full rounded-xl border border-white/10 bg-[#0B0A0F] px-4 py-3 text-sm text-white outline-none focus:border-[#A8328D]"
+              className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none placeholder:text-[#796A83] focus:border-[#B900F5]"
             />
 
             <select
               value={selectedEvent}
-              onChange={(event) => setSelectedEvent(event.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-[#0B0A0F] px-4 py-3 text-sm text-white outline-none focus:border-[#A8328D]"
+              onChange={(event) =>
+                setSelectedEvent(event.target.value)
+              }
+              className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none focus:border-[#B900F5]"
             >
               <option value="all">Todos os eventos</option>
+
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
                   {event.name}
@@ -256,31 +284,41 @@ export default function RegistrationsPage() {
 
         <section>
           <div className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-[#B99A55]">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#E27BFF]">
               Participantes
             </p>
-            <h2 className="mt-1 text-xl font-bold text-white">
+
+            <h2 className="mt-2 text-xl font-bold text-white">
               Inscrições cadastradas
             </h2>
+
+            <p className="mt-2 text-sm text-[#AD99B8]">
+              {filteredRegistrations.length} inscrições encontradas
+            </p>
           </div>
 
           {loading ? (
-            <p className="py-10 text-center text-sm text-gray-400">
-              Carregando inscrições...
-            </p>
+            <div className="py-12 text-center">
+              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
+
+              <p className="mt-4 text-sm text-[#AD99B8]">
+                Carregando inscrições...
+              </p>
+            </div>
           ) : filteredRegistrations.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/15 bg-[#15121A] px-6 py-12 text-center">
+            <div className="rounded-2xl border border-dashed border-[#B900F5]/25 bg-[#1A0C24] px-6 py-12 text-center">
               <h3 className="text-lg font-bold text-white">
                 Nenhuma inscrição encontrada
               </h3>
-              <p className="mt-2 text-sm text-gray-400">
+
+              <p className="mt-2 text-sm text-[#AD99B8]">
                 Tente alterar os filtros de pesquisa.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#15121A]">
+            <div className="overflow-x-auto rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24]">
               <table className="w-full min-w-[750px] text-left text-sm">
-                <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-gray-400">
+                <thead className="border-b border-[#B900F5]/20 bg-[#30133E] text-xs uppercase tracking-wider text-[#D7C4E0]">
                   <tr>
                     <th className="px-5 py-4">Participante</th>
                     <th className="px-5 py-4">Contato</th>
@@ -291,25 +329,34 @@ export default function RegistrationsPage() {
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-white/10">
+                <tbody className="divide-y divide-[#B900F5]/10">
                   {filteredRegistrations.map((registration) => (
-                    <tr key={registration.id}>
+                    <tr
+                      key={registration.id}
+                      className="transition hover:bg-[#B900F5]/5"
+                    >
                       <td className="px-5 py-4 font-semibold text-white">
-                        {registration.participant_details?.name ?? "Participante"}
+                        {registration.participant_details?.name ??
+                          "Participante"}
                       </td>
 
-                      <td className="px-5 py-4 text-gray-400">
-                        <p>{registration.participant_details?.email ?? "—"}</p>
+                      <td className="px-5 py-4 text-[#AD99B8]">
+                        <p>
+                          {registration.participant_details?.email ??
+                            "—"}
+                        </p>
+
                         <p className="mt-1 text-xs">
-                          {registration.participant_details?.phone_number ?? "Sem telefone"}
+                          {registration.participant_details
+                            ?.phone_number ?? "Sem telefone"}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 text-gray-300">
+                      <td className="px-5 py-4 text-[#D7C4E0]">
                         {getEventName(registration.event)}
                       </td>
 
-                      <td className="px-5 py-4 text-gray-400">
+                      <td className="px-5 py-4 text-[#AD99B8]">
                         {formatDate(registration.registration_date)}
                       </td>
 
@@ -317,8 +364,8 @@ export default function RegistrationsPage() {
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             registration.status === "ACTIVE"
-                              ? "bg-green-500/10 text-green-400"
-                              : "bg-gray-500/10 text-gray-400"
+                              ? "bg-[#B900F5]/15 text-[#E27BFF]"
+                              : "bg-white/5 text-[#AD99B8]"
                           }`}
                         >
                           {registration.status === "ACTIVE"
@@ -330,18 +377,23 @@ export default function RegistrationsPage() {
                       <td className="px-5 py-4">
                         {registration.status === "ACTIVE" ? (
                           <button
+                            type="button"
                             onClick={() =>
-                              handleCancelRegistration(registration.id)
+                              handleCancelRegistration(
+                                registration.id
+                              )
                             }
-                            disabled={updatingId === registration.id}
-                            className="rounded-lg border border-red-500/20 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
+                            disabled={
+                              updatingId === registration.id
+                            }
+                            className="rounded-lg border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
                           >
                             {updatingId === registration.id
                               ? "Cancelando..."
                               : "Cancelar"}
                           </button>
                         ) : (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-[#8F7A9B]">
                             Sem ações
                           </span>
                         )}
@@ -353,7 +405,11 @@ export default function RegistrationsPage() {
             </div>
           )}
         </section>
+
+        <footer className="border-t border-[#B900F5]/15 pt-6 text-center text-xs tracking-wider text-[#796A83]">
+          EVENTHUB · THE EXPERIENCE STARTS HERE
+        </footer>
       </div>
-    </>
+    </div>
   );
 }
