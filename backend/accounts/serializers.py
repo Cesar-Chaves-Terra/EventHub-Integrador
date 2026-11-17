@@ -1,7 +1,8 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-
+from django.db import transaction
+from events.models import OrganizerProfile
 
 class UserSerializer(serializers.ModelSerializer):
     """Dados do usuário logado (nunca expõe a senha)."""
@@ -27,4 +28,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password2')
-        return User.objects.create_user(**validated_data)
+
+        with transaction.atomic():
+            user = User.objects.create_user(**validated_data)
+            OrganizerProfile.objects.create(user=user)
+
+        return user
