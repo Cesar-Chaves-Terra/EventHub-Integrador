@@ -88,11 +88,12 @@ export default function EventBanner({
         </h3>
 
         <p className="mt-5 max-w-lg text-sm leading-7 text-gray-300 md:text-base">
-          Organize seus eventos, acompanhe a capacidade e gerencie
-          suas vagas em um só lugar.
+          Organize seus eventos, acompanhe a capacidade e
+          gerencie suas vagas em um só lugar.
         </p>
 
         <button
+          type="button"
           onClick={onCreateClick}
           className="mt-8 rounded-xl bg-[#A8328D] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#A8328D]/20 transition hover:bg-[#D66ABD]"
         >
