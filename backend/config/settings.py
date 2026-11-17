@@ -44,6 +44,9 @@ INSTALLED_APPS = [
     # Apps do projeto
     'accounts',
     'core',
+    
+    'events',
+    'participants.apps.ParticipantsConfig',
 ]
 
 MIDDLEWARE = [
