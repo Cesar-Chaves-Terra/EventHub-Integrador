@@ -13,13 +13,13 @@ export default function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6 md:px-10">
+    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#B900F5]/15 bg-[#100819] px-6 py-6 md:px-10">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#B99A55]">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#E27BFF]">
           {eyebrow}
         </p>
 
-        <h2 className="mt-1 text-2xl font-bold text-white md:text-3xl">
+        <h2 className="mt-2 text-2xl font-bold text-white md:text-3xl">
           {title}
         </h2>
       </div>
