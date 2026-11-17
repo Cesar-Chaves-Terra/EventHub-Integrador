@@ -36,9 +36,3 @@ Com tudo rodando:
 
 - Backend: http://127.0.0.1:8000
 - Frontend: http://localhost:3000
-
-
-
-
-
-EventHub@2026
