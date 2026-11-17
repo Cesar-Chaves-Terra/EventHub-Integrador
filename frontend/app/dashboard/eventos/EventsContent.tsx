@@ -55,7 +55,9 @@ export default function EventsContent() {
       );
 
       setEvents(
-        Array.isArray(response) ? response : response.results
+        Array.isArray(response)
+          ? response
+          : response.results
       );
     } catch (err) {
       setError(
@@ -128,9 +130,12 @@ export default function EventsContent() {
   function handleCancel() {
     setShowForm(false);
     setEditingEvent(null);
+    setError("");
   }
 
-  async function handleSubmit(data: EventFormData): Promise<void> {
+  async function handleSubmit(
+    data: EventFormData
+  ): Promise<void> {
     const token = sessionStorage.getItem("access");
 
     if (!token) {
@@ -182,7 +187,9 @@ export default function EventsContent() {
     }
   }
 
-  async function handleDelete(eventId: number): Promise<void> {
+  async function handleDelete(
+    eventId: number
+  ): Promise<void> {
     const confirmed = window.confirm(
       "Deseja realmente excluir este evento?"
     );
@@ -205,7 +212,9 @@ export default function EventsContent() {
     try {
       await apiRequest<unknown>(
         `/events/${eventId}/`,
-        { method: "DELETE" },
+        {
+          method: "DELETE",
+        },
         token
       );
 
@@ -215,6 +224,7 @@ export default function EventsContent() {
       }
 
       setMessage("Evento excluído com sucesso!");
+
       await loadEvents();
     } catch (err) {
       setError(
@@ -260,14 +270,14 @@ export default function EventsContent() {
   return (
     <div className="min-h-screen bg-[#0C0612] text-[#F7ECFC]">
       <PageHeader
-        eyebrow="The EventHub Experience"
-        title="Gerenciamento de eventos"
+        eyebrow="Gerenciamento"
+        title="Eventos"
       />
 
       <div className="mx-auto max-w-7xl space-y-7 p-6 md:p-10">
-        {/* Banner */}
-        <section className="relative overflow-hidden rounded-2xl border border-[#B900F5]/20 bg-gradient-to-br from-[#30133E] via-[#1A0C24] to-[#0C0612] p-7 md:p-10">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[#B900F5]/20 blur-3xl" />
+        {/* Welcome banner */}
+        <section className="relative isolate overflow-hidden rounded-2xl border border-[#B900F5]/20 bg-gradient-to-br from-[#30133E] via-[#1A0C24] to-[#0C0612] p-7 md:p-10">
+          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[#B900F5]/15 blur-3xl" />
 
           <div className="relative z-10">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#E27BFF]">
@@ -287,14 +297,58 @@ export default function EventsContent() {
 
         {/* Feedback */}
         {message && (
-          <div className="rounded-xl border border-[#B900F5]/30 bg-[#B900F5]/10 p-4 text-sm text-[#E27BFF]">
+          <div
+            role="status"
+            className="rounded-xl border border-[#B900F5]/30 bg-[#B900F5]/10 p-4 text-sm text-[#E27BFF]"
+          >
             {message}
           </div>
         )}
 
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+          <div
+            role="alert"
+            className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
+          >
             {error}
+          </div>
+        )}
+
+        {/* Create event */}
+        <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-5 md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                Cadastrar novo evento
+              </h2>
+
+              <p className="mt-2 text-sm text-[#AD99B8]">
+                Abra o formulário para adicionar um novo evento.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCreateClick}
+              className="rounded-xl bg-[#B900F5] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#B900F5]/20 transition hover:bg-[#D338FF]"
+            >
+              + Cadastrar novo evento
+            </button>
+          </div>
+        </section>
+
+        {/* Event form */}
+        {showForm && (
+          <div
+            ref={formRef}
+            className="scroll-mt-6"
+          >
+            <EventForm
+              initialData={getFormInitialData()}
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+              loading={saving}
+            />
           </div>
         )}
 
@@ -321,8 +375,8 @@ export default function EventsContent() {
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-white/10 bg-[#1A0C24] p-12 text-center">
-              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
+            <div className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-10 text-center">
+              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
 
               <p className="mt-4 text-sm text-[#AD99B8]">
                 Carregando eventos...
@@ -335,7 +389,7 @@ export default function EventsContent() {
               </h3>
 
               <p className="mt-2 text-sm text-[#AD99B8]">
-                Utilize a opção abaixo para criar seu primeiro evento.
+                Utilize a opção acima para criar seu primeiro evento.
               </p>
             </div>
           ) : (
@@ -364,41 +418,6 @@ export default function EventsContent() {
           totalCapacity={totalCapacity}
           availableSeats={availableSeats}
         />
-
-        {/* Create event */}
-        <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-5 md:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-5">
-            <div>
-              <h2 className="text-xl font-bold text-white">
-                Cadastrar novo evento
-              </h2>
-
-              <p className="mt-2 text-sm text-[#AD99B8]">
-                Abra o formulário para adicionar um novo evento.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCreateClick}
-              className="rounded-xl bg-[#B900F5] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#B900F5]/20 transition hover:bg-[#D338FF]"
-            >
-              + Cadastrar novo evento
-            </button>
-          </div>
-        </section>
-
-        {/* Create/edit form */}
-        {showForm && (
-          <div ref={formRef} className="scroll-mt-6">
-            <EventForm
-              initialData={getFormInitialData()}
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-              loading={saving}
-            />
-          </div>
-        )}
 
         <footer className="border-t border-[#B900F5]/15 pt-6 text-center text-xs tracking-wider text-[#796A83]">
           EVENTHUB · THE EXPERIENCE STARTS HERE
