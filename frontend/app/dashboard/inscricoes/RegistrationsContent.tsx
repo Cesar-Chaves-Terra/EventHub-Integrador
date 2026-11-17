@@ -22,7 +22,6 @@ interface RegistrationItem {
 }
 
 type RegistrationStatus = RegistrationItem["status"];
-
 type ListResponse<T> = T[] | { results: T[] };
 
 function normalizeList<T>(data: ListResponse<T>): T[] {
@@ -179,20 +178,18 @@ export default function RegistrationsContent() {
     setMessage("");
 
     try {
-      let participantId: number;
-
       if (getAvailableSeats(data.event) <= 0) {
         throw new Error(
           "Este evento não possui vagas disponíveis."
         );
       }
 
+      let participantId: number | null = null;
+
       if (data.participantType === "existing") {
         participantId = data.participant;
       } else {
-        const normalizedEmail = data.email
-          .trim()
-          .toLowerCase();
+        const normalizedEmail = data.email.trim().toLowerCase();
 
         const existingParticipant = participants.find(
           (participant) =>
@@ -203,22 +200,32 @@ export default function RegistrationsContent() {
         if (existingParticipant) {
           participantId = existingParticipant.id;
         } else {
-          const participant =
-            await apiRequest<RegistrationParticipant>(
-              "/participants/",
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  name: data.name,
-                  email: normalizedEmail,
-                  phone_number: data.phone_number || null,
-                }),
-              },
-              token
-            );
+          // Create the participant and registration atomically.
+          await apiRequest<RegistrationItem>(
+            "/registrations/enroll/",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                event: data.event,
+                name: data.name.trim(),
+                email: normalizedEmail,
+                phone_number: data.phone_number || null,
+              }),
+            },
+            token
+          );
 
-          participantId = participant.id;
+          setMessage("Inscrição cadastrada com sucesso!");
+          setShowForm(false);
+          await loadRegistrations();
+          return;
         }
+      }
+
+      if (participantId === null) {
+        throw new Error(
+          "Não foi possível identificar o participante."
+        );
       }
 
       const existingRegistration = findExistingRegistration(
@@ -239,9 +246,7 @@ export default function RegistrationsContent() {
           token
         );
 
-        setMessage(
-          "Inscrição existente reativada com sucesso!"
-        );
+        setMessage("Inscrição reativada com sucesso!");
       } else {
         await apiRequest<RegistrationItem>(
           "/registrations/",
