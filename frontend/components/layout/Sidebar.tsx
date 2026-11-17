@@ -11,33 +11,21 @@ interface SidebarProps {
 export default function Sidebar({ onLogout }: SidebarProps) {
   const pathname = usePathname();
 
-  const baseClass =
-    "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition";
-
-  const inactiveClass =
-    "text-gray-400 hover:bg-white/5 hover:text-white";
-
-  const activeClass =
-    "border border-[#A8328D]/30 bg-[#A8328D]/15 font-semibold text-white";
-
   const menuItems = [
     {
       label: "Dashboard",
       href: "/dashboard",
       icon: "⌂",
-      iconColor: "",
     },
     {
       label: "Eventos",
       href: "/dashboard/eventos",
       icon: "✦",
-      iconColor: "text-[#D66ABD]",
     },
     {
       label: "Inscrições",
       href: "/dashboard/inscricoes",
       icon: "♙",
-      iconColor: "text-[#B99A55]",
     },
   ];
 
@@ -68,11 +56,24 @@ export default function Sidebar({ onLogout }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`${baseClass} ${
-                isActive ? activeClass : inactiveClass
+              className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition ${
+                isActive
+                  ? "border border-[#A8328D]/30 bg-[#A8328D]/15 font-semibold text-white"
+                  : "text-gray-400 hover:bg-white/5 hover:text-white"
               }`}
             >
-              <span className={item.iconColor}>{item.icon}</span>
+              <span
+                className={
+                  item.label === "Eventos"
+                    ? "text-[#D66ABD]"
+                    : item.label === "Inscrições"
+                      ? "text-[#B99A55]"
+                      : ""
+                }
+              >
+                {item.icon}
+              </span>
+
               {item.label}
             </Link>
           );
