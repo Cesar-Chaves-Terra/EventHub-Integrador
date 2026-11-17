@@ -1,8 +1,19 @@
 
-from rest_framework import mixins, permissions, serializers, viewsets
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
+
+from rest_framework import (
+    mixins,
+    permissions,
+    serializers,
+    viewsets,
+)
 
 from .models import Participant, Registration
-from .serializers import ParticipantSerializer, RegistrationSerializer
+from .serializers import (
+    ParticipantSerializer,
+    RegistrationSerializer,
+)
 
 
 class ParticipantViewSet(
@@ -30,8 +41,9 @@ class RegistrationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return (
-            Registration.objects
-            .filter(event__organizer__user=self.request.user)
+            Registration.objects.filter(
+                event__organizer__user=self.request.user
+            )
             .select_related("event", "participant")
         )
 
@@ -44,12 +56,31 @@ class RegistrationViewSet(viewsets.ModelViewSet):
                 )
             })
 
+    def save_registration(self, serializer):
+        try:
+            with transaction.atomic():
+                serializer.save()
+
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({
+                "detail": exc.messages
+            }) from exc
+
+        except IntegrityError as exc:
+            raise serializers.ValidationError({
+                "detail": (
+                    "Não foi possível salvar a inscrição. "
+                    "Verifique se o participante já está "
+                    "inscrito neste evento."
+                )
+            }) from exc
+
     def perform_create(self, serializer):
         event = serializer.validated_data["event"]
 
         self.validate_event_ownership(event)
 
-        serializer.save()
+        self.save_registration(serializer)
 
     def perform_update(self, serializer):
         event = serializer.validated_data.get(
@@ -67,15 +98,17 @@ class RegistrationViewSet(viewsets.ModelViewSet):
                 )
             })
 
-        if "participant" in serializer.validated_data:
-            participant = serializer.validated_data["participant"]
+        participant = serializer.validated_data.get(
+            "participant",
+            serializer.instance.participant
+        )
 
-            if participant.pk != serializer.instance.participant_id:
-                raise serializers.ValidationError({
-                    "participant": (
-                        "Não é possível alterar o participante "
-                        "de uma inscrição existente."
-                    )
-                })
+        if participant.pk != serializer.instance.participant_id:
+            raise serializers.ValidationError({
+                "participant": (
+                    "Não é possível alterar o participante "
+                    "de uma inscrição existente."
+                )
+            })
 
-        serializer.save()
+        self.save_registration(serializer)
