@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
+
 import PageHeader from "@/components/layout/PageHeader";
 import EventCard from "@/components/events/EventCard";
 import EventForm, {
@@ -32,8 +33,10 @@ export default function EventsContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
+
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -55,7 +58,9 @@ export default function EventsContent() {
       );
 
       setEvents(
-        Array.isArray(response) ? response : response.results
+        Array.isArray(response)
+          ? response
+          : response.results
       );
     } catch (err) {
       setError(
@@ -73,7 +78,9 @@ export default function EventsContent() {
   }, [loadEvents]);
 
   useEffect(() => {
-    if (!showForm) return;
+    if (!showForm) {
+      return;
+    }
 
     const frame = requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({
@@ -134,7 +141,9 @@ export default function EventsContent() {
     setError("");
   }
 
-  async function handleSubmit(data: EventFormData): Promise<void> {
+  async function handleSubmit(
+    data: EventFormData
+  ): Promise<void> {
     const token = sessionStorage.getItem("access");
 
     if (!token) {
@@ -178,6 +187,7 @@ export default function EventsContent() {
 
       setShowForm(false);
       setEditingEvent(null);
+
       await loadEvents();
     } catch (err) {
       setError(
@@ -190,15 +200,23 @@ export default function EventsContent() {
     }
   }
 
-  async function handleDelete(eventId: number): Promise<void> {
-    const event = events.find((item) => item.id === eventId);
+  async function handleDelete(
+    eventId: number
+  ): Promise<void> {
+    const event = events.find(
+      (item) => item.id === eventId
+    );
 
     if (!event?.can_manage) {
       setError("Você não pode excluir este evento.");
       return;
     }
 
-    if (!window.confirm("Deseja realmente excluir este evento?")) {
+    const confirmed = window.confirm(
+      "Deseja realmente excluir este evento?"
+    );
+
+    if (!confirmed) {
       return;
     }
 
@@ -216,7 +234,9 @@ export default function EventsContent() {
     try {
       await apiRequest<unknown>(
         `/events/${eventId}/`,
-        { method: "DELETE" },
+        {
+          method: "DELETE",
+        },
         token
       );
 
@@ -226,6 +246,7 @@ export default function EventsContent() {
       }
 
       setMessage("Evento excluído com sucesso!");
+
       await loadEvents();
     } catch (err) {
       setError(
@@ -239,32 +260,41 @@ export default function EventsContent() {
   }
 
   function getFormInitialData(): EventFormData | null {
-    if (!editingEvent) return null;
+    if (!editingEvent) {
+      return null;
+    }
 
-    const date = new Date(editingEvent.date);
-    const pad = (value: number) => String(value).padStart(2, "0");
+    const eventDate = new Date(editingEvent.date);
+
+    const pad = (value: number) =>
+      String(value).padStart(2, "0");
+
+    const localDate = [
+      eventDate.getFullYear(),
+      "-",
+      pad(eventDate.getMonth() + 1),
+      "-",
+      pad(eventDate.getDate()),
+      "T",
+      pad(eventDate.getHours()),
+      ":",
+      pad(eventDate.getMinutes()),
+    ].join("");
 
     return {
       name: editingEvent.name,
       description: editingEvent.description,
-      date: [
-        date.getFullYear(),
-        "-",
-        pad(date.getMonth() + 1),
-        "-",
-        pad(date.getDate()),
-        "T",
-        pad(date.getHours()),
-        ":",
-        pad(date.getMinutes()),
-      ].join(""),
+      date: localDate,
       capacity: editingEvent.capacity,
     };
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <PageHeader eyebrow="Gerenciamento" title="Eventos" />
+      <PageHeader
+        eyebrow="Gerenciamento"
+        title="Eventos"
+      />
 
       <div className="mx-auto max-w-7xl space-y-7 p-6 md:p-10">
         <section className="relative isolate overflow-hidden rounded-2xl border border-border-theme bg-gradient-to-br from-surface-elevated via-surface-card to-background p-7 md:p-10">
@@ -327,8 +357,12 @@ export default function EventsContent() {
         </section>
 
         {showForm && (
-          <div ref={formRef} className="scroll-mt-6">
+          <div
+            ref={formRef}
+            className="scroll-mt-6"
+          >
             <EventForm
+              key={editingEvent?.id ?? "new"}
               initialData={getFormInitialData()}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
@@ -359,14 +393,19 @@ export default function EventsContent() {
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-border-theme bg-surface-card p-10 text-center text-text-muted">
-              Carregando eventos...
+            <div className="rounded-2xl border border-border-theme bg-surface-card p-10 text-center">
+              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-border-theme border-t-primary" />
+
+              <p className="mt-4 text-sm text-text-muted">
+                Carregando eventos...
+              </p>
             </div>
           ) : events.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border-theme bg-surface-card px-6 py-12 text-center">
               <h3 className="text-lg font-bold text-text-primary">
                 Nenhum evento cadastrado
               </h3>
+
               <p className="mt-2 text-sm text-text-muted">
                 Utilize a opção acima para criar seu primeiro evento.
               </p>
