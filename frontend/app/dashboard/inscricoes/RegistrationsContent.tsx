@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
+
 import PageHeader from "@/components/layout/PageHeader";
 import RegistrationForm, {
   type RegistrationEvent,
@@ -46,6 +47,7 @@ export default function RegistrationsContent() {
 
   const [search, setSearch] = useState("");
   const [selectedEvent, setSelectedEvent] = useState("all");
+
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -80,6 +82,7 @@ export default function RegistrationsContent() {
       setEvents(normalizeList(eventsData));
       setParticipants(normalizeList(participantsData));
       setRegistrations(normalizeList(registrationsData));
+      setError("");
     } catch (err) {
       setError(
         err instanceof Error
@@ -92,11 +95,19 @@ export default function RegistrationsContent() {
   }, [router]);
 
   useEffect(() => {
-    void loadRegistrations();
+    const timeoutId = window.setTimeout(() => {
+      void loadRegistrations();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [loadRegistrations]);
 
   useEffect(() => {
-    if (!showForm) return;
+    if (!showForm) {
+      return;
+    }
 
     const frame = requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({
@@ -226,6 +237,7 @@ export default function RegistrationsContent() {
 
           setMessage("Inscrição cadastrada com sucesso!");
           setShowForm(false);
+
           await loadRegistrations();
           return;
         }
@@ -317,7 +329,9 @@ export default function RegistrationsContent() {
         : "Deseja reativar esta inscrição?"
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     const token = sessionStorage.getItem("access");
 
@@ -508,6 +522,7 @@ export default function RegistrationsContent() {
                 <p className="text-xs font-medium text-text-muted">
                   {stat.label}
                 </p>
+
                 <span className="text-lg text-primary-soft">
                   {stat.icon}
                 </span>
@@ -519,6 +534,7 @@ export default function RegistrationsContent() {
                     ? "..."
                     : stat.value.toLocaleString("pt-BR")}
                 </p>
+
                 <p className="mt-1 text-xs text-text-muted">
                   {stat.description}
                 </p>
@@ -589,6 +605,7 @@ export default function RegistrationsContent() {
               <h3 className="text-lg font-bold text-text-primary">
                 Nenhuma inscrição encontrada
               </h3>
+
               <p className="mt-2 text-sm text-text-muted">
                 Cadastre uma inscrição ou altere os filtros.
               </p>
@@ -633,6 +650,7 @@ export default function RegistrationsContent() {
                             {registration.participant_details?.email ??
                               "—"}
                           </p>
+
                           <p className="mt-1 text-xs">
                             {registration.participant_details
                               ?.phone_number || "Sem telefone"}
