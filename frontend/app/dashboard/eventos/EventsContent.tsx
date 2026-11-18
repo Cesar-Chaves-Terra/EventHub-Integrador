@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
-
 import PageHeader from "@/components/layout/PageHeader";
 import EventCard from "@/components/events/EventCard";
 import EventForm, {
@@ -20,6 +19,7 @@ interface EventItem {
   capacity: number;
   available_seats: number;
   organizer: string;
+  can_manage: boolean;
 }
 
 type EventsResponse = EventItem[] | { results: EventItem[] };
@@ -32,10 +32,8 @@ export default function EventsContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
-
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -48,6 +46,8 @@ export default function EventsContent() {
     }
 
     try {
+      setError("");
+
       const response = await apiRequest<EventsResponse>(
         "/events/",
         {},
@@ -55,9 +55,7 @@ export default function EventsContent() {
       );
 
       setEvents(
-        Array.isArray(response)
-          ? response
-          : response.results
+        Array.isArray(response) ? response : response.results
       );
     } catch (err) {
       setError(
@@ -75,9 +73,7 @@ export default function EventsContent() {
   }, [loadEvents]);
 
   useEffect(() => {
-    if (!showForm) {
-      return;
-    }
+    if (!showForm) return;
 
     const frame = requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({
@@ -114,6 +110,11 @@ export default function EventsContent() {
   }
 
   function handleEdit(event: EventItem) {
+    if (!event.can_manage) {
+      setError("Você não pode editar este evento.");
+      return;
+    }
+
     setEditingEvent(event);
     setError("");
     setMessage("");
@@ -133,13 +134,16 @@ export default function EventsContent() {
     setError("");
   }
 
-  async function handleSubmit(
-    data: EventFormData
-  ): Promise<void> {
+  async function handleSubmit(data: EventFormData): Promise<void> {
     const token = sessionStorage.getItem("access");
 
     if (!token) {
       router.replace("/");
+      return;
+    }
+
+    if (editingEvent && !editingEvent.can_manage) {
+      setError("Você não pode editar este evento.");
       return;
     }
 
@@ -174,7 +178,6 @@ export default function EventsContent() {
 
       setShowForm(false);
       setEditingEvent(null);
-
       await loadEvents();
     } catch (err) {
       setError(
@@ -187,14 +190,15 @@ export default function EventsContent() {
     }
   }
 
-  async function handleDelete(
-    eventId: number
-  ): Promise<void> {
-    const confirmed = window.confirm(
-      "Deseja realmente excluir este evento?"
-    );
+  async function handleDelete(eventId: number): Promise<void> {
+    const event = events.find((item) => item.id === eventId);
 
-    if (!confirmed) {
+    if (!event?.can_manage) {
+      setError("Você não pode excluir este evento.");
+      return;
+    }
+
+    if (!window.confirm("Deseja realmente excluir este evento?")) {
       return;
     }
 
@@ -212,9 +216,7 @@ export default function EventsContent() {
     try {
       await apiRequest<unknown>(
         `/events/${eventId}/`,
-        {
-          method: "DELETE",
-        },
+        { method: "DELETE" },
         token
       );
 
@@ -224,7 +226,6 @@ export default function EventsContent() {
       }
 
       setMessage("Evento excluído com sucesso!");
-
       await loadEvents();
     } catch (err) {
       setError(
@@ -238,68 +239,57 @@ export default function EventsContent() {
   }
 
   function getFormInitialData(): EventFormData | null {
-    if (!editingEvent) {
-      return null;
-    }
+    if (!editingEvent) return null;
 
-    const eventDate = new Date(editingEvent.date);
-
-    const pad = (value: number) =>
-      String(value).padStart(2, "0");
-
-    const localDate = [
-      eventDate.getFullYear(),
-      "-",
-      pad(eventDate.getMonth() + 1),
-      "-",
-      pad(eventDate.getDate()),
-      "T",
-      pad(eventDate.getHours()),
-      ":",
-      pad(eventDate.getMinutes()),
-    ].join("");
+    const date = new Date(editingEvent.date);
+    const pad = (value: number) => String(value).padStart(2, "0");
 
     return {
       name: editingEvent.name,
       description: editingEvent.description,
-      date: localDate,
+      date: [
+        date.getFullYear(),
+        "-",
+        pad(date.getMonth() + 1),
+        "-",
+        pad(date.getDate()),
+        "T",
+        pad(date.getHours()),
+        ":",
+        pad(date.getMinutes()),
+      ].join(""),
       capacity: editingEvent.capacity,
     };
   }
 
   return (
-    <div className="min-h-screen bg-[#0C0612] text-[#F7ECFC]">
-      <PageHeader
-        eyebrow="Gerenciamento"
-        title="Eventos"
-      />
+    <div className="min-h-screen bg-background text-foreground">
+      <PageHeader eyebrow="Gerenciamento" title="Eventos" />
 
       <div className="mx-auto max-w-7xl space-y-7 p-6 md:p-10">
-        {/* Welcome banner */}
-        <section className="relative isolate overflow-hidden rounded-2xl border border-[#B900F5]/20 bg-gradient-to-br from-[#30133E] via-[#1A0C24] to-[#0C0612] p-7 md:p-10">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[#B900F5]/15 blur-3xl" />
+        <section className="relative isolate overflow-hidden rounded-2xl border border-border-theme bg-gradient-to-br from-surface-elevated via-surface-card to-background p-7 md:p-10">
+          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
 
           <div className="relative z-10">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#E27BFF]">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary-soft">
               EventHub Experience
             </p>
 
-            <h2 className="mt-3 text-2xl font-black text-white md:text-4xl">
+            <h2 className="mt-3 text-2xl font-black text-text-primary md:text-4xl">
               Seus eventos, sua experiência.
             </h2>
 
-            <p className="mt-3 max-w-xl text-sm leading-7 text-[#CBB5D5]">
+            <p className="mt-3 max-w-xl text-sm leading-7 text-text-secondary">
               Acompanhe sua programação, gerencie participantes
               e personalize suas experiências.
             </p>
           </div>
         </section>
 
-        {/* Feedback */}
         {message && (
           <div
             role="status"
-            className="rounded-xl border border-[#B900F5]/30 bg-[#B900F5]/10 p-4 text-sm text-[#E27BFF]"
+            className="rounded-xl border border-border-theme bg-primary/10 p-4 text-sm text-primary-soft"
           >
             {message}
           </div>
@@ -308,21 +298,20 @@ export default function EventsContent() {
         {error && (
           <div
             role="alert"
-            className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
+            className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-500"
           >
             {error}
           </div>
         )}
 
-        {/* Create event */}
-        <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-5 md:p-6">
+        <section className="rounded-2xl border border-border-theme bg-surface-card p-5 md:p-6">
           <div className="flex flex-wrap items-center justify-between gap-5">
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-xl font-bold text-text-primary">
                 Cadastrar novo evento
               </h2>
 
-              <p className="mt-2 text-sm text-[#AD99B8]">
+              <p className="mt-2 text-sm text-text-muted">
                 Abra o formulário para adicionar um novo evento.
               </p>
             </div>
@@ -330,19 +319,15 @@ export default function EventsContent() {
             <button
               type="button"
               onClick={handleCreateClick}
-              className="rounded-xl bg-[#B900F5] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#B900F5]/20 transition hover:bg-[#D338FF]"
+              className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-hover"
             >
               + Cadastrar novo evento
             </button>
           </div>
         </section>
 
-        {/* Event form */}
         {showForm && (
-          <div
-            ref={formRef}
-            className="scroll-mt-6"
-          >
+          <div ref={formRef} className="scroll-mt-6">
             <EventForm
               initialData={getFormInitialData()}
               onSubmit={handleSubmit}
@@ -352,43 +337,37 @@ export default function EventsContent() {
           </div>
         )}
 
-        {/* Registered events */}
         <section>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#E27BFF]">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary-soft">
                 Sua programação
               </p>
 
-              <h2 className="mt-2 text-2xl font-bold text-white">
+              <h2 className="mt-2 text-2xl font-bold text-text-primary">
                 Eventos cadastrados
               </h2>
 
-              <p className="mt-2 text-sm text-[#AD99B8]">
-                Consulte, edite ou exclua os eventos existentes.
+              <p className="mt-2 text-sm text-text-muted">
+                Consulte os eventos existentes e gerencie os seus.
               </p>
             </div>
 
-            <span className="rounded-xl border border-[#B900F5]/25 bg-[#24102F] px-4 py-2 text-sm font-semibold text-[#E27BFF]">
+            <span className="rounded-xl border border-border-theme bg-surface-elevated px-4 py-2 text-sm font-semibold text-primary-soft">
               {events.length} eventos
             </span>
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-10 text-center">
-              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
-
-              <p className="mt-4 text-sm text-[#AD99B8]">
-                Carregando eventos...
-              </p>
+            <div className="rounded-2xl border border-border-theme bg-surface-card p-10 text-center text-text-muted">
+              Carregando eventos...
             </div>
           ) : events.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#B900F5]/25 bg-[#1A0C24] px-6 py-12 text-center">
-              <h3 className="text-lg font-bold text-white">
+            <div className="rounded-2xl border border-dashed border-border-theme bg-surface-card px-6 py-12 text-center">
+              <h3 className="text-lg font-bold text-text-primary">
                 Nenhum evento cadastrado
               </h3>
-
-              <p className="mt-2 text-sm text-[#AD99B8]">
+              <p className="mt-2 text-sm text-text-muted">
                 Utilize a opção acima para criar seu primeiro evento.
               </p>
             </div>
@@ -406,20 +385,19 @@ export default function EventsContent() {
           )}
 
           {deletingId !== null && (
-            <p className="mt-4 text-sm text-[#E27BFF]">
+            <p className="mt-4 text-sm text-primary-soft">
               Excluindo evento #{deletingId}...
             </p>
           )}
         </section>
 
-        {/* Compact statistics */}
         <EventStats
           totalEvents={events.length}
           totalCapacity={totalCapacity}
           availableSeats={availableSeats}
         />
 
-        <footer className="border-t border-[#B900F5]/15 pt-6 text-center text-xs tracking-wider text-[#796A83]">
+        <footer className="border-t border-border-theme pt-6 text-center text-xs tracking-wider text-text-muted">
           EVENTHUB · THE EXPERIENCE STARTS HERE
         </footer>
       </div>
