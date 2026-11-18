@@ -42,19 +42,28 @@ export default function DashboardContent() {
     }
 
     try {
-      setError("");
-
       const [dashboardData, eventsData] = await Promise.all([
-        apiRequest<DashboardData>("/dashboard/", {}, token),
-        apiRequest<EventsResponse>("/events/", {}, token),
+        apiRequest<DashboardData>(
+          "/dashboard/",
+          {},
+          token
+        ),
+        apiRequest<EventsResponse>(
+          "/events/",
+          {},
+          token
+        ),
       ]);
 
       setData(dashboardData);
+
       setEvents(
         Array.isArray(eventsData)
           ? eventsData
           : eventsData.results
       );
+
+      setError("");
     } catch (err) {
       setError(
         err instanceof Error
@@ -67,7 +76,13 @@ export default function DashboardContent() {
   }, [router]);
 
   useEffect(() => {
-    void loadDashboard();
+    const timeoutId = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [loadDashboard]);
 
   function formatDate(date: string): string {
@@ -119,6 +134,7 @@ export default function DashboardContent() {
       />
 
       <div className="mx-auto max-w-7xl space-y-7 p-6 md:p-10">
+        {/* Welcome banner */}
         <section className="relative isolate overflow-hidden rounded-2xl border border-border-theme bg-gradient-to-br from-surface-elevated via-surface-card to-background p-7 md:p-10">
           <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
 
@@ -129,6 +145,7 @@ export default function DashboardContent() {
 
             <h2 className="mt-3 text-2xl font-black leading-tight text-text-primary md:text-4xl">
               Gerencie seus eventos.
+
               <span className="block text-primary-soft">
                 Crie experiências.
               </span>
@@ -140,7 +157,9 @@ export default function DashboardContent() {
 
             <button
               type="button"
-              onClick={() => router.push("/dashboard/eventos")}
+              onClick={() =>
+                router.push("/dashboard/eventos")
+              }
               className="mt-6 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-hover"
             >
               Gerenciar eventos →
@@ -148,6 +167,7 @@ export default function DashboardContent() {
           </div>
         </section>
 
+        {/* Feedback */}
         {error && (
           <div
             role="alert"
@@ -157,6 +177,7 @@ export default function DashboardContent() {
           </div>
         )}
 
+        {/* Recent events */}
         <section>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -171,7 +192,9 @@ export default function DashboardContent() {
 
             <button
               type="button"
-              onClick={() => router.push("/dashboard/eventos")}
+              onClick={() =>
+                router.push("/dashboard/eventos")
+              }
               className="text-sm font-semibold text-primary-soft transition hover:opacity-75"
             >
               Ver todos →
@@ -198,7 +221,9 @@ export default function DashboardContent() {
 
               <button
                 type="button"
-                onClick={() => router.push("/dashboard/eventos")}
+                onClick={() =>
+                  router.push("/dashboard/eventos")
+                }
                 className="mt-6 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-hover"
               >
                 + Criar evento
@@ -238,7 +263,8 @@ export default function DashboardContent() {
                       <p className="mt-4 text-xs text-text-muted">
                         Vagas restantes:{" "}
                         <span className="font-semibold text-primary-soft">
-                          {event.available_seats} / {event.capacity}
+                          {event.available_seats} /{" "}
+                          {event.capacity}
                         </span>
                       </p>
                     </div>
@@ -249,6 +275,7 @@ export default function DashboardContent() {
           )}
         </section>
 
+        {/* Compact overview */}
         <section>
           <div className="mb-5">
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary-soft">
