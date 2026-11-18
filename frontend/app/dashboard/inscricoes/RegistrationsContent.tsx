@@ -47,7 +47,6 @@ export default function RegistrationsContent() {
 
   const [search, setSearch] = useState("");
   const [selectedEvent, setSelectedEvent] = useState("all");
-
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -99,15 +98,11 @@ export default function RegistrationsContent() {
       void loadRegistrations();
     }, 0);
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    return () => window.clearTimeout(timeoutId);
   }, [loadRegistrations]);
 
   useEffect(() => {
-    if (!showForm) {
-      return;
-    }
+    if (!showForm) return;
 
     const frame = requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({
@@ -237,7 +232,6 @@ export default function RegistrationsContent() {
 
           setMessage("Inscrição cadastrada com sucesso!");
           setShowForm(false);
-
           await loadRegistrations();
           return;
         }
@@ -329,9 +323,7 @@ export default function RegistrationsContent() {
         : "Deseja reativar esta inscrição?"
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     const token = sessionStorage.getItem("access");
 
@@ -363,6 +355,51 @@ export default function RegistrationsContent() {
         err instanceof Error
           ? err.message
           : "Não foi possível atualizar a inscrição."
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function handleDeleteRegistration(
+    registration: RegistrationItem
+  ): Promise<void> {
+    if (!getManagedEvent(registration.event)) {
+      setError("Você não pode excluir esta inscrição.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Deseja excluir definitivamente esta inscrição? Essa ação não pode ser desfeita."
+    );
+
+    if (!confirmed) return;
+
+    const token = sessionStorage.getItem("access");
+
+    if (!token) {
+      router.replace("/");
+      return;
+    }
+
+    setUpdatingId(registration.id);
+    setError("");
+    setMessage("");
+
+    try {
+      await apiRequest<unknown>(
+        `/registrations/${registration.id}/`,
+        { method: "DELETE" },
+        token
+      );
+
+      setMessage("Inscrição excluída com sucesso!");
+      await loadRegistrations();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível excluir a inscrição."
       );
     } finally {
       setUpdatingId(null);
@@ -612,7 +649,7 @@ export default function RegistrationsContent() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-border-theme bg-surface-card">
-              <table className="w-full min-w-[750px] text-left text-sm">
+              <table className="w-full min-w-[850px] text-left text-sm">
                 <thead className="border-b border-border-theme bg-surface-elevated text-xs uppercase tracking-wider text-text-secondary">
                   <tr>
                     <th className="px-4 py-3">Participante</th>
@@ -620,7 +657,7 @@ export default function RegistrationsContent() {
                     <th className="px-4 py-3">Evento</th>
                     <th className="px-4 py-3">Data</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Ação</th>
+                    <th className="px-4 py-3">Ações</th>
                   </tr>
                 </thead>
 
@@ -678,32 +715,40 @@ export default function RegistrationsContent() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void handleChangeStatus(registration)
-                            }
-                            disabled={
-                              updatingId !== null ||
-                              (!isActive && !eventHasSeats)
-                            }
-                            title={
-                              !isActive && !eventHasSeats
-                                ? "Evento sem vagas disponíveis"
-                                : undefined
-                            }
-                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                              isActive
-                                ? "border-red-400/30 text-red-500 hover:bg-red-500/10"
-                                : "border-border-theme text-primary-soft hover:bg-primary/10"
-                            }`}
-                          >
-                            {isUpdating
-                              ? "Atualizando..."
-                              : isActive
-                                ? "Cancelar"
-                                : "Reativar"}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleChangeStatus(registration)
+                              }
+                              disabled={
+                                updatingId !== null ||
+                                (!isActive && !eventHasSeats)
+                              }
+                              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-40 ${
+                                isActive
+                                  ? "border-red-400/30 text-red-500 hover:bg-red-500/10"
+                                  : "border-border-theme text-primary-soft hover:bg-primary/10"
+                              }`}
+                            >
+                              {isUpdating
+                                ? "Aguarde..."
+                                : isActive
+                                  ? "Cancelar"
+                                  : "Reativar"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleDeleteRegistration(registration)
+                              }
+                              disabled={updatingId !== null}
+                              className="rounded-lg border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:opacity-40"
+                            >
+                              Excluir
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
