@@ -1,6 +1,7 @@
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
 from rest_framework import (
     mixins,
@@ -25,19 +26,37 @@ class ParticipantViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
     serializer_class = ParticipantSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return (
-            Participant.objects.filter(
-                registrations__event__organizer__user=self.request.user
+        user = self.request.user
+
+        accessible = (
+            Q(created_by=user)
+            | Q(registrations__event__organizer__user=user)
+        )
+
+        if self.action in ["update", "partial_update"]:
+            accessible = (
+                Q(created_by=user)
+                | Q(
+                    created_by__isnull=True,
+                    registrations__event__organizer__user=user,
+                )
             )
+
+        return (
+            Participant.objects.filter(accessible)
             .distinct()
             .order_by("name")
         )
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
 
 class RegistrationViewSet(viewsets.ModelViewSet):
@@ -89,7 +108,7 @@ class RegistrationViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         event = serializer.validated_data.get(
             "event",
-            serializer.instance.event
+            serializer.instance.event,
         )
 
         self.validate_event_ownership(event)
@@ -104,7 +123,7 @@ class RegistrationViewSet(viewsets.ModelViewSet):
 
         participant = serializer.validated_data.get(
             "participant",
-            serializer.instance.participant
+            serializer.instance.participant,
         )
 
         if participant.pk != serializer.instance.participant_id:
@@ -156,7 +175,9 @@ class RegistrationViewSet(viewsets.ModelViewSet):
 
         try:
             with transaction.atomic():
-                participant = participant_serializer.save()
+                participant = participant_serializer.save(
+                    created_by=request.user
+                )
 
                 registration_serializer = RegistrationSerializer(
                     data={
