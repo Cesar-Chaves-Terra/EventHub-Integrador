@@ -16,6 +16,16 @@ interface DashboardLayoutProps {
 
 type Theme = "dark" | "light";
 
+function getSavedTheme(): Theme {
+  if (typeof window === "undefined") {
+    return "dark";
+  }
+
+  const savedTheme = localStorage.getItem("eventhub-theme");
+
+  return savedTheme === "light" ? "light" : "dark";
+}
+
 export default function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
@@ -23,32 +33,47 @@ export default function DashboardLayout({
 
   const [authenticated, setAuthenticated] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [theme, setTheme] = useState<Theme>("dark");
+
+  const [theme, setTheme] = useState<Theme>(getSavedTheme);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("eventhub-theme");
-    const initialTheme: Theme =
-      savedTheme === "light" ? "light" : "dark";
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
-    setTheme(initialTheme);
-    document.documentElement.dataset.theme = initialTheme;
-
+  useEffect(() => {
     let mounted = true;
 
     async function checkAuthentication() {
-      const valid = await validateSession();
+      try {
+        const valid = await validateSession();
 
-      if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
-      if (!valid) {
+        if (!valid) {
+          sessionStorage.removeItem("access");
+          sessionStorage.removeItem("refresh");
+
+          router.replace("/");
+          return;
+        }
+
+        setAuthenticated(true);
+      } catch {
+        if (!mounted) {
+          return;
+        }
+
         sessionStorage.removeItem("access");
         sessionStorage.removeItem("refresh");
-        router.replace("/");
-      } else {
-        setAuthenticated(true);
-      }
 
-      setCheckingSession(false);
+        router.replace("/");
+      } finally {
+        if (mounted) {
+          setCheckingSession(false);
+        }
+      }
     }
 
     void checkAuthentication();
@@ -63,6 +88,7 @@ export default function DashboardLayout({
       theme === "dark" ? "light" : "dark";
 
     setTheme(nextTheme);
+
     document.documentElement.dataset.theme = nextTheme;
     localStorage.setItem("eventhub-theme", nextTheme);
   }
@@ -72,6 +98,7 @@ export default function DashboardLayout({
     sessionStorage.removeItem("refresh");
 
     setAuthenticated(false);
+
     router.replace("/");
   }
 
@@ -103,6 +130,7 @@ export default function DashboardLayout({
                 ? "Ativar modo claro"
                 : "Ativar modo escuro"
             }
+            aria-pressed={theme === "light"}
             className="flex items-center gap-2 rounded-xl border border-border-theme bg-surface-elevated px-4 py-2 text-sm font-semibold text-text-primary transition hover:border-primary"
           >
             <span aria-hidden="true">
