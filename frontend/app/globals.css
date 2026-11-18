@@ -1,26 +1,112 @@
+
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Default dark theme */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #0c0612;
+  --foreground: #f7ecfc;
+
+  --surface: #100819;
+  --surface-card: #1a0c24;
+  --surface-elevated: #24102f;
+  --surface-input: #0c0612;
+
+  --primary: #b900f5;
+  --primary-hover: #d338ff;
+  --primary-soft: #e27bff;
+
+  --text-primary: #f7ecfc;
+  --text-secondary: #cbb5d5;
+  --text-muted: #ad99b8;
+
+  --border-theme: rgb(185 0 245 / 20%);
 }
+
+/* Soft light theme */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --background: #f2eff5;
+  --foreground: #24102f;
+
+  --surface: #faf8fc;
+  --surface-card: #faf8fc;
+  --surface-elevated: #eae3ef;
+  --surface-input: #ffffff;
+
+  --primary: #64118c;
+  --primary-hover: #8116b5;
+  --primary-soft: #64118c;
+
+  --text-primary: #24102f;
+  --text-secondary: #5c4d66;
+  --text-muted: #71637c;
+
+  --border-theme: rgb(100 17 140 / 15%);
+}
+
+/* Tailwind CSS 4 */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-card: var(--surface-card);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-input: var(--surface-input);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-border-theme: var(--border-theme);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Global elements */
+
+html {
+  background-color: var(--background);
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  margin: 0;
+  background-color: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input,
+textarea,
+select {
+  color-scheme: inherit;
+}
+
+::selection {
+  background-color: var(--primary);
+  color: #ffffff;
 }
