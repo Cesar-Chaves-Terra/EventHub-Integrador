@@ -47,8 +47,12 @@ export default function EventForm({
     initialData?.capacity,
   ]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
+
+    if (!date || Number(capacity) < 1) return;
 
     await onSubmit({
       name: name.trim(),
@@ -61,23 +65,26 @@ export default function EventForm({
   const isEditing = Boolean(initialData);
 
   const inputClass =
-    "w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#796A83] focus:border-[#B900F5] focus:ring-1 focus:ring-[#B900F5]/30";
+    "w-full rounded-xl border border-border-theme bg-surface-input px-4 py-3 text-sm text-text-primary outline-none transition placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30";
+
+  const labelClass =
+    "mb-2 block text-sm font-medium text-text-secondary";
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#B900F5]/30 bg-[#1A0C24] shadow-xl shadow-black/20">
+    <section className="overflow-hidden rounded-2xl border border-border-theme bg-surface-card shadow-lg">
       <div className="h-1 bg-gradient-to-r from-[#64118C] via-[#B900F5] to-[#E27BFF]" />
 
       <div className="p-6 md:p-8">
         <div className="mb-7">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#E27BFF]">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary-soft">
             EventHub Administration
           </p>
 
-          <h3 className="mt-3 text-2xl font-bold text-white">
+          <h3 className="mt-3 text-2xl font-bold text-text-primary">
             {isEditing ? "Editar evento" : "Cadastrar novo evento"}
           </h3>
 
-          <p className="mt-2 text-sm text-[#AD99B8]">
+          <p className="mt-2 text-sm text-text-muted">
             {isEditing
               ? "Atualize as informações do evento selecionado."
               : "Preencha os dados para criar uma nova experiência."}
@@ -86,10 +93,7 @@ export default function EventForm({
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label
-              htmlFor="event-name"
-              className="mb-2 block text-sm font-medium text-[#D7C4E0]"
-            >
+            <label htmlFor="event-name" className={labelClass}>
               Nome do evento
             </label>
 
@@ -106,10 +110,7 @@ export default function EventForm({
           </div>
 
           <div>
-            <label
-              htmlFor="event-description"
-              className="mb-2 block text-sm font-medium text-[#D7C4E0]"
-            >
+            <label htmlFor="event-description" className={labelClass}>
               Descrição
             </label>
 
@@ -128,10 +129,7 @@ export default function EventForm({
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
-              <label
-                htmlFor="event-date"
-                className="mb-2 block text-sm font-medium text-[#D7C4E0]"
-              >
+              <label htmlFor="event-date" className={labelClass}>
                 Data e horário
               </label>
 
@@ -146,10 +144,7 @@ export default function EventForm({
             </div>
 
             <div>
-              <label
-                htmlFor="event-capacity"
-                className="mb-2 block text-sm font-medium text-[#D7C4E0]"
-              >
+              <label htmlFor="event-capacity" className={labelClass}>
                 Capacidade máxima
               </label>
 
@@ -158,9 +153,7 @@ export default function EventForm({
                 type="number"
                 min="1"
                 value={capacity}
-                onChange={(event) =>
-                  setCapacity(event.target.value)
-                }
+                onChange={(event) => setCapacity(event.target.value)}
                 placeholder="Ex.: 150"
                 required
                 className={inputClass}
@@ -168,12 +161,12 @@ export default function EventForm({
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 border-t border-[#B900F5]/15 pt-6">
+          <div className="flex flex-wrap justify-end gap-3 border-t border-border-theme pt-6">
             <button
               type="button"
               onClick={onCancel}
               disabled={loading}
-              className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-[#D7C4E0] transition hover:bg-white/5 disabled:opacity-50"
+              className="rounded-xl border border-border-theme px-5 py-3 text-sm font-semibold text-text-secondary transition hover:bg-surface-elevated disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -181,7 +174,7 @@ export default function EventForm({
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-[#B900F5] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#B900F5]/20 transition hover:bg-[#D338FF] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-hover disabled:opacity-50"
             >
               {loading
                 ? "Salvando..."
