@@ -9,6 +9,7 @@ interface EventItem {
   capacity: number;
   available_seats: number;
   organizer: string;
+  can_manage: boolean;
 }
 
 interface EventCardProps {
@@ -124,23 +125,25 @@ export default function EventCard({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-[#B900F5]/15 pt-5">
-          <button
-            type="button"
-            onClick={() => onEdit(event)}
-            className="rounded-xl border border-[#B900F5]/40 bg-[#B900F5]/10 px-5 py-2.5 text-sm font-semibold text-[#E27BFF] transition hover:border-[#B900F5] hover:bg-[#B900F5]/20"
-          >
-            Editar
-          </button>
+        {event.can_manage && (
+          <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-[#B900F5]/15 pt-5">
+            <button
+              type="button"
+              onClick={() => onEdit(event)}
+              className="rounded-xl border border-[#B900F5]/40 bg-[#B900F5]/10 px-5 py-2.5 text-sm font-semibold text-[#E27BFF] transition hover:border-[#B900F5] hover:bg-[#B900F5]/20"
+            >
+              Editar
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onDelete(event.id)}
-            className="rounded-xl border border-red-400/20 px-5 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
-          >
-            Excluir
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => onDelete(event.id)}
+              className="rounded-xl border border-red-400/20 px-5 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+            >
+              Excluir
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );
