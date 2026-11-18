@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
-
 import PageHeader from "@/components/layout/PageHeader";
 import RegistrationForm, {
   type RegistrationEvent,
@@ -47,7 +46,6 @@ export default function RegistrationsContent() {
 
   const [search, setSearch] = useState("");
   const [selectedEvent, setSelectedEvent] = useState("all");
-
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -98,9 +96,7 @@ export default function RegistrationsContent() {
   }, [loadRegistrations]);
 
   useEffect(() => {
-    if (!showForm) {
-      return;
-    }
+    if (!showForm) return;
 
     const frame = requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({
@@ -134,6 +130,12 @@ export default function RegistrationsContent() {
     return (
       events.find((event) => event.id === eventId)
         ?.available_seats ?? 0
+    );
+  }
+
+  function getManagedEvent(eventId: number) {
+    return events.find(
+      (event) => event.id === eventId && event.can_manage
     );
   }
 
@@ -178,7 +180,15 @@ export default function RegistrationsContent() {
     setMessage("");
 
     try {
-      if (getAvailableSeats(data.event) <= 0) {
+      const event = getManagedEvent(data.event);
+
+      if (!event) {
+        throw new Error(
+          "Você não tem permissão para inscrever pessoas neste evento."
+        );
+      }
+
+      if (event.available_seats <= 0) {
         throw new Error(
           "Este evento não possui vagas disponíveis."
         );
@@ -200,7 +210,6 @@ export default function RegistrationsContent() {
         if (existingParticipant) {
           participantId = existingParticipant.id;
         } else {
-          // Create the participant and registration atomically.
           await apiRequest<RegistrationItem>(
             "/registrations/enroll/",
             {
@@ -209,7 +218,7 @@ export default function RegistrationsContent() {
                 event: data.event,
                 name: data.name.trim(),
                 email: normalizedEmail,
-                phone_number: data.phone_number || null,
+                phone_number: data.phone_number.trim() || null,
               }),
             },
             token
@@ -281,9 +290,15 @@ export default function RegistrationsContent() {
     registration: RegistrationItem
   ): Promise<void> {
     const isActive = registration.status === "ACTIVE";
+
     const newStatus: RegistrationStatus = isActive
       ? "CANCELLED"
       : "ACTIVE";
+
+    if (!getManagedEvent(registration.event)) {
+      setError("Você não pode gerenciar esta inscrição.");
+      return;
+    }
 
     if (
       newStatus === "ACTIVE" &&
@@ -302,9 +317,7 @@ export default function RegistrationsContent() {
         : "Deseja reativar esta inscrição?"
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     const token = sessionStorage.getItem("access");
 
@@ -407,26 +420,26 @@ export default function RegistrationsContent() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0C0612] text-[#F7ECFC]">
+    <div className="min-h-screen bg-background text-foreground">
       <PageHeader
         eyebrow="Gerenciamento"
         title="Inscrições"
       />
 
       <div className="mx-auto max-w-7xl space-y-7 p-6 md:p-10">
-        <section className="relative overflow-hidden rounded-2xl border border-[#B900F5]/20 bg-gradient-to-br from-[#30133E] via-[#1A0C24] to-[#0C0612] p-7 md:p-10">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[#B900F5]/15 blur-3xl" />
+        <section className="relative overflow-hidden rounded-2xl border border-border-theme bg-gradient-to-br from-surface-elevated via-surface-card to-background p-7 md:p-10">
+          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
 
           <div className="relative z-10">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#E27BFF]">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary-soft">
               EventHub Experience
             </p>
 
-            <h2 className="mt-3 text-2xl font-black text-white md:text-4xl">
+            <h2 className="mt-3 text-2xl font-black text-text-primary md:text-4xl">
               Gerencie seus participantes.
             </h2>
 
-            <p className="mt-3 max-w-xl text-sm leading-7 text-[#CBB5D5]">
+            <p className="mt-3 max-w-xl text-sm leading-7 text-text-secondary">
               Consulte inscrições, acompanhe participantes e
               organize a ocupação dos seus eventos.
             </p>
@@ -436,7 +449,7 @@ export default function RegistrationsContent() {
         {message && (
           <div
             role="status"
-            className="rounded-xl border border-[#B900F5]/30 bg-[#B900F5]/10 p-4 text-sm text-[#E27BFF]"
+            className="rounded-xl border border-border-theme bg-primary/10 p-4 text-sm text-primary-soft"
           >
             {message}
           </div>
@@ -445,20 +458,20 @@ export default function RegistrationsContent() {
         {error && (
           <div
             role="alert"
-            className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
+            className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-500"
           >
             {error}
           </div>
         )}
 
-        <section className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-5 md:p-6">
+        <section className="rounded-2xl border border-border-theme bg-surface-card p-5 md:p-6">
           <div className="flex flex-wrap items-center justify-between gap-5">
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-xl font-bold text-text-primary">
                 Nova inscrição
               </h2>
 
-              <p className="mt-2 text-sm text-[#AD99B8]">
+              <p className="mt-2 text-sm text-text-muted">
                 Cadastre um participante em um evento disponível.
               </p>
             </div>
@@ -466,7 +479,7 @@ export default function RegistrationsContent() {
             <button
               type="button"
               onClick={handleCreateClick}
-              className="rounded-xl bg-[#B900F5] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#B900F5]/20 transition hover:bg-[#D338FF]"
+              className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-hover"
             >
               + Nova inscrição
             </button>
@@ -489,26 +502,24 @@ export default function RegistrationsContent() {
           {stats.map((stat) => (
             <div
               key={stat.label}
-              className="flex min-h-28 flex-col justify-between rounded-xl border border-[#B900F5]/20 bg-[#1A0C24] p-4 transition hover:border-[#B900F5]/50"
+              className="flex min-h-28 flex-col justify-between rounded-xl border border-border-theme bg-surface-card p-4 transition hover:border-primary/50"
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium text-[#AD99B8]">
+                <p className="text-xs font-medium text-text-muted">
                   {stat.label}
                 </p>
-
-                <span className="text-lg text-[#E27BFF]">
+                <span className="text-lg text-primary-soft">
                   {stat.icon}
                 </span>
               </div>
 
               <div className="mt-2">
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-text-primary">
                   {loading
                     ? "..."
                     : stat.value.toLocaleString("pt-BR")}
                 </p>
-
-                <p className="mt-1 text-xs text-[#8F7A9B]">
+                <p className="mt-1 text-xs text-text-muted">
                   {stat.description}
                 </p>
               </div>
@@ -519,25 +530,25 @@ export default function RegistrationsContent() {
         <section>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#E27BFF]">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary-soft">
                 Participantes
               </p>
 
-              <h2 className="mt-2 text-2xl font-bold text-white">
+              <h2 className="mt-2 text-2xl font-bold text-text-primary">
                 Inscrições cadastradas
               </h2>
 
-              <p className="mt-2 text-sm text-[#AD99B8]">
+              <p className="mt-2 text-sm text-text-muted">
                 Consulte os participantes e gerencie suas inscrições.
               </p>
             </div>
 
-            <span className="rounded-xl border border-[#B900F5]/25 bg-[#24102F] px-4 py-2 text-sm font-semibold text-[#E27BFF]">
+            <span className="rounded-xl border border-border-theme bg-surface-elevated px-4 py-2 text-sm font-semibold text-primary-soft">
               {registrations.length} inscrições
             </span>
           </div>
 
-          <div className="mb-5 rounded-xl border border-[#B900F5]/20 bg-[#1A0C24] p-4">
+          <div className="mb-5 rounded-xl border border-border-theme bg-surface-card p-4">
             <div className="grid gap-3 md:grid-cols-2">
               <input
                 type="text"
@@ -545,7 +556,7 @@ export default function RegistrationsContent() {
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar por nome ou e-mail..."
                 aria-label="Buscar inscrições"
-                className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none placeholder:text-[#796A83] focus:border-[#B900F5]"
+                className="w-full rounded-xl border border-border-theme bg-surface-input px-4 py-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-primary"
               />
 
               <select
@@ -554,41 +565,38 @@ export default function RegistrationsContent() {
                   setSelectedEvent(event.target.value)
                 }
                 aria-label="Filtrar por evento"
-                className="w-full rounded-xl border border-[#B900F5]/20 bg-[#0C0612] px-4 py-3 text-sm text-white outline-none focus:border-[#B900F5]"
+                className="w-full rounded-xl border border-border-theme bg-surface-input px-4 py-3 text-sm text-text-primary outline-none focus:border-primary"
               >
                 <option value="all">Todos os eventos</option>
 
-                {events.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.name}
-                  </option>
-                ))}
+                {events
+                  .filter((event) => event.can_manage)
+                  .map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24] p-10 text-center">
-              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-white/10 border-t-[#B900F5]" />
-
-              <p className="mt-4 text-sm text-[#AD99B8]">
-                Carregando inscrições...
-              </p>
+            <div className="rounded-2xl border border-border-theme bg-surface-card p-10 text-center text-text-muted">
+              Carregando inscrições...
             </div>
           ) : filteredRegistrations.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#B900F5]/25 bg-[#1A0C24] px-6 py-12 text-center">
-              <h3 className="text-lg font-bold text-white">
+            <div className="rounded-2xl border border-dashed border-border-theme bg-surface-card px-6 py-12 text-center">
+              <h3 className="text-lg font-bold text-text-primary">
                 Nenhuma inscrição encontrada
               </h3>
-
-              <p className="mt-2 text-sm text-[#AD99B8]">
+              <p className="mt-2 text-sm text-text-muted">
                 Cadastre uma inscrição ou altere os filtros.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-[#B900F5]/20 bg-[#1A0C24]">
+            <div className="overflow-x-auto rounded-2xl border border-border-theme bg-surface-card">
               <table className="w-full min-w-[750px] text-left text-sm">
-                <thead className="border-b border-[#B900F5]/20 bg-[#30133E] text-xs uppercase tracking-wider text-[#D7C4E0]">
+                <thead className="border-b border-border-theme bg-surface-elevated text-xs uppercase tracking-wider text-text-secondary">
                   <tr>
                     <th className="px-4 py-3">Participante</th>
                     <th className="px-4 py-3">Contato</th>
@@ -599,7 +607,7 @@ export default function RegistrationsContent() {
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-[#B900F5]/10">
+                <tbody className="divide-y divide-border-theme">
                   {filteredRegistrations.map((registration) => {
                     const isActive =
                       registration.status === "ACTIVE";
@@ -613,30 +621,29 @@ export default function RegistrationsContent() {
                     return (
                       <tr
                         key={registration.id}
-                        className="transition hover:bg-[#B900F5]/5"
+                        className="transition hover:bg-primary/5"
                       >
-                        <td className="px-4 py-3 font-semibold text-white">
+                        <td className="px-4 py-3 font-semibold text-text-primary">
                           {registration.participant_details?.name ??
                             "Participante"}
                         </td>
 
-                        <td className="px-4 py-3 text-[#AD99B8]">
+                        <td className="px-4 py-3 text-text-muted">
                           <p className="break-all">
                             {registration.participant_details?.email ??
                               "—"}
                           </p>
-
                           <p className="mt-1 text-xs">
                             {registration.participant_details
                               ?.phone_number || "Sem telefone"}
                           </p>
                         </td>
 
-                        <td className="px-4 py-3 text-[#D7C4E0]">
+                        <td className="px-4 py-3 text-text-secondary">
                           {getEventName(registration.event)}
                         </td>
 
-                        <td className="whitespace-nowrap px-4 py-3 text-[#AD99B8]">
+                        <td className="whitespace-nowrap px-4 py-3 text-text-muted">
                           {formatDate(registration.registration_date)}
                         </td>
 
@@ -644,8 +651,8 @@ export default function RegistrationsContent() {
                           <span
                             className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
                               isActive
-                                ? "bg-[#B900F5]/15 text-[#E27BFF]"
-                                : "bg-white/5 text-[#AD99B8]"
+                                ? "bg-primary/10 text-primary-soft"
+                                : "bg-surface-elevated text-text-muted"
                             }`}
                           >
                             {isActive ? "Ativa" : "Cancelada"}
@@ -656,7 +663,7 @@ export default function RegistrationsContent() {
                           <button
                             type="button"
                             onClick={() =>
-                              handleChangeStatus(registration)
+                              void handleChangeStatus(registration)
                             }
                             disabled={
                               updatingId !== null ||
@@ -669,8 +676,8 @@ export default function RegistrationsContent() {
                             }
                             className={`rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                               isActive
-                                ? "border-red-400/20 text-red-300 hover:bg-red-500/10"
-                                : "border-[#B900F5]/30 text-[#E27BFF] hover:bg-[#B900F5]/10"
+                                ? "border-red-400/30 text-red-500 hover:bg-red-500/10"
+                                : "border-border-theme text-primary-soft hover:bg-primary/10"
                             }`}
                           >
                             {isUpdating
@@ -689,7 +696,7 @@ export default function RegistrationsContent() {
           )}
         </section>
 
-        <footer className="border-t border-[#B900F5]/15 pt-6 text-center text-xs tracking-wider text-[#796A83]">
+        <footer className="border-t border-border-theme pt-6 text-center text-xs tracking-wider text-text-muted">
           EVENTHUB · THE EXPERIENCE STARTS HERE
         </footer>
       </div>
