@@ -49,8 +49,6 @@ export default function EventsContent() {
     }
 
     try {
-      setError("");
-
       const response = await apiRequest<EventsResponse>(
         "/events/",
         {},
@@ -74,7 +72,13 @@ export default function EventsContent() {
   }, [router]);
 
   useEffect(() => {
-    void loadEvents();
+    const timeoutId = window.setTimeout(() => {
+      void loadEvents();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [loadEvents]);
 
   useEffect(() => {
